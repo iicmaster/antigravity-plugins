@@ -123,7 +123,10 @@ export function buildAgyArgv(options = {}, supportsPrintTimeout = true) {
     argv.push("--add-dir", dir);
   }
 
-  argv.push(normalized.prompt);
+  // agy v1.0.x reads the prompt from stdin in --print mode and silently
+  // drops any trailing positional argument. Keep the prompt out of argv
+  // (also keeps it off the process command line) — it is piped to the
+  // child's stdin in runJobFile().
   return argv;
 }
 
@@ -324,7 +327,7 @@ export async function runJobFile(jobFile, env = process.env) {
       cwd,
       env,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["pipe", "pipe", "pipe"]
     });
 
     upsertJob(cwd, {
@@ -334,6 +337,7 @@ export async function runJobFile(jobFile, env = process.env) {
 
     let stdout = "";
     let stderr = "";
+    let stdinError = null;
     let timedOut = false;
     let settled = false;
     let forceKillTimer = null;
@@ -361,6 +365,19 @@ export async function runJobFile(jobFile, env = process.env) {
       }
     }
 
+    function recordStdinError(error) {
+      if (stdinError) {
+        return;
+      }
+      stdinError = error;
+      const message = `agy stdin write failed: ${error.message}\n`;
+      stderr += message;
+      fs.appendFileSync(payload.logFile, message, "utf8");
+      if (!settled) {
+        child.kill("SIGTERM");
+      }
+    }
+
     child.stdout.on("data", (chunk) => {
       const text = chunk.toString();
       stdout += text;
@@ -372,6 +389,15 @@ export async function runJobFile(jobFile, env = process.env) {
       stderr += text;
       fs.appendFileSync(payload.logFile, text, "utf8");
     });
+
+    if (child.stdin) {
+      child.stdin.on("error", recordStdinError);
+      try {
+        child.stdin.end(payload.runOptions.prompt ?? "", "utf8");
+      } catch (error) {
+        recordStdinError(error);
+      }
+    }
 
     child.on("error", (error) => {
       clearProcessTimers();
@@ -393,14 +419,18 @@ export async function runJobFile(jobFile, env = process.env) {
       clearProcessTimers();
       const endedAt = nowIso();
       const resultText = [stdout, stderr].filter(Boolean).join(stdout && stderr ? "\n" : "");
-      const status = timedOut ? "failed" : exitCode === 0 ? "succeeded" : "failed";
+      const status = timedOut || stdinError ? "failed" : exitCode === 0 ? "succeeded" : "failed";
       fs.writeFileSync(payload.resultFile, resultText, "utf8");
       upsertJob(cwd, {
         id: payload.id,
         status,
         exitCode,
         signal,
-        error: timedOut ? `agy timed out after ${payload.runOptions.printTimeout}` : undefined,
+        error: timedOut
+          ? `agy timed out after ${payload.runOptions.printTimeout}`
+          : stdinError
+            ? `agy stdin write failed: ${stdinError.message}`
+            : undefined,
         endedAt
       }, env);
       resolve({ status, stdout, stderr, exitCode, signal });

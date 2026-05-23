@@ -19,7 +19,23 @@ import { collectGitReviewContext } from "../plugins/agy/scripts/lib/git-context.
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("buildAgyArgv uses argv boundaries instead of shell interpolation", () => {
+function writeFakeAgy(binDir, script) {
+  fs.mkdirSync(binDir, { recursive: true });
+  const fakeAgy = path.join(binDir, "agy");
+  fs.writeFileSync(fakeAgy, script, "utf8");
+  fs.chmodSync(fakeAgy, 0o755);
+  return fakeAgy;
+}
+
+function fakeAgyEnv(cwd, binDir) {
+  return {
+    ...process.env,
+    CLAUDE_PLUGIN_DATA: path.join(cwd, "plugin-data"),
+    PATH: `${binDir}${path.delimiter}${process.env.PATH}`
+  };
+}
+
+test("buildAgyArgv emits only flags; the prompt is piped via stdin", () => {
   const prompt = 'review this"; rm -rf / #';
   const argv = buildAgyArgv({
     prompt,
@@ -29,6 +45,9 @@ test("buildAgyArgv uses argv boundaries instead of shell interpolation", () => {
     sandbox: true
   });
 
+  // agy --print reads the prompt from stdin and drops trailing positional
+  // arguments. Including the prompt in argv would also leak it to the OS
+  // process list, so it is intentionally absent here.
   assert.deepEqual(argv, [
     "--print",
     "--print-timeout",
@@ -37,9 +56,9 @@ test("buildAgyArgv uses argv boundaries instead of shell interpolation", () => {
     "/tmp/agy.log",
     "--sandbox",
     "--add-dir",
-    ROOT,
-    prompt
+    ROOT
   ]);
+  assert.ok(!argv.includes(prompt));
 });
 
 test("dangerous permission bypass is explicit and never enabled by default", () => {
@@ -93,10 +112,8 @@ test("goDurationToMilliseconds parses bounded Go-style durations", () => {
 test("runJobFile enforces print-timeout as a hard wrapper timeout", async () => {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-timeout-"));
   const binDir = path.join(cwd, "bin");
-  fs.mkdirSync(binDir);
-  const fakeAgy = path.join(binDir, "agy");
-  fs.writeFileSync(
-    fakeAgy,
+  writeFakeAgy(
+    binDir,
     `#!/usr/bin/env node
 if (process.argv.includes("--help")) {
   console.log("--print --print-timeout --sandbox --add-dir --continue --conversation");
@@ -104,15 +121,9 @@ if (process.argv.includes("--help")) {
 }
 setTimeout(() => process.stdout.write("late output"), 1000);
 `,
-    "utf8"
   );
-  fs.chmodSync(fakeAgy, 0o755);
 
-  const env = {
-    ...process.env,
-    CLAUDE_PLUGIN_DATA: path.join(cwd, "plugin-data"),
-    PATH: `${binDir}${path.delimiter}${process.env.PATH}`
-  };
+  const env = fakeAgyEnv(cwd, binDir);
   const payload = createJob(cwd, {
     kind: "rescue",
     prompt: "x",
@@ -125,6 +136,103 @@ setTimeout(() => process.stdout.write("late output"), 1000);
 
   assert.equal(result.status, "failed");
   assert.match(fs.readFileSync(payload.resultFile, "utf8"), /timed out after 100ms/i);
+});
+
+test("runJobFile pipes the prompt through stdin without leaking it to argv or command logs", async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-stdin-"));
+  const binDir = path.join(cwd, "bin");
+  writeFakeAgy(
+    binDir,
+    `#!/usr/bin/env node
+if (process.argv.includes("--help")) {
+  console.log("--print --print-timeout --sandbox --add-dir --continue --conversation");
+  process.exit(0);
+}
+let stdin = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  stdin += chunk;
+});
+process.stdin.on("end", () => {
+  process.stdout.write(JSON.stringify({ argv: process.argv.slice(2), stdin }));
+});
+`
+  );
+
+  const env = fakeAgyEnv(cwd, binDir);
+  const prompt = 'review this"; keep me off argv';
+  const payload = createJob(cwd, {
+    kind: "rescue",
+    prompt,
+    addDirs: [cwd],
+    printTimeout: "5s",
+    sandbox: true
+  }, env);
+
+  const result = await runJobFile(payload.jobFile, env);
+  const output = JSON.parse(result.stdout);
+  const log = fs.readFileSync(payload.logFile, "utf8");
+
+  assert.equal(result.status, "succeeded");
+  assert.equal(output.stdin, prompt);
+  assert.ok(!output.argv.includes(prompt));
+  assert.ok(!log.includes(prompt));
+});
+
+test("runJobFile survives stdin EPIPE when agy exits before draining a large prompt", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-epipe-"));
+  const binDir = path.join(cwd, "bin");
+  writeFakeAgy(
+    binDir,
+    `#!/usr/bin/env node
+if (process.argv.includes("--help")) {
+  console.log("--print --print-timeout --sandbox --add-dir --continue --conversation");
+  process.exit(0);
+}
+process.exit(0);
+`
+  );
+
+  const helper = path.join(cwd, "run-helper.mjs");
+  fs.writeFileSync(
+    helper,
+    `import { createJob, runJobFile } from ${JSON.stringify(path.join(ROOT, "plugins/agy/scripts/lib/agy-runtime.mjs"))};
+import fs from "node:fs";
+import path from "node:path";
+
+const cwd = ${JSON.stringify(cwd)};
+const env = {
+  ...process.env,
+  CLAUDE_PLUGIN_DATA: path.join(cwd, "plugin-data"),
+  PATH: ${JSON.stringify(binDir)} + path.delimiter + process.env.PATH
+};
+const payload = createJob(cwd, {
+  kind: "rescue",
+  prompt: "x".repeat(16 * 1024 * 1024),
+  addDirs: [cwd],
+  printTimeout: "5s",
+  sandbox: true
+}, env);
+const result = await runJobFile(payload.jobFile, env);
+await new Promise((resolve) => setTimeout(resolve, 100));
+if (result.status !== "failed") {
+  throw new Error("expected stdin write failure to fail the job");
+}
+const resultText = fs.readFileSync(payload.resultFile, "utf8");
+if (!/stdin write failed/i.test(resultText)) {
+  throw new Error("expected result file to mention stdin write failure");
+}
+`,
+    "utf8"
+  );
+
+  const result = spawnSync(process.execPath, [helper], {
+    cwd,
+    env: fakeAgyEnv(cwd, binDir),
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
 });
 
 test("git review context includes bounded untracked file contents", () => {

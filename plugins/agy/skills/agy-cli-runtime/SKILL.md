@@ -14,6 +14,6 @@ node "<plugin-root>/scripts/agy-companion.mjs" <command> "<raw arguments>"
 
 Safety rules:
 - Call `agy` through Node `spawn` argv arrays, not shell-interpolated strings.
-- Use `agy --print <prompt>` for MVP non-interactive runs.
+- Use `agy --print` for non-interactive runs and pipe the prompt through child stdin.
 - Add `--dangerously-skip-permissions` only when explicitly requested.
 - Keep logs and state under `CLAUDE_PLUGIN_DATA` when available.
