@@ -19,7 +19,7 @@ import { collectGitReviewContext } from "../plugins/agy/scripts/lib/git-context.
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("buildAgyArgv uses argv boundaries instead of shell interpolation", () => {
+test("buildAgyArgv emits only flags; the prompt is piped via stdin", () => {
   const prompt = 'review this"; rm -rf / #';
   const argv = buildAgyArgv({
     prompt,
@@ -29,6 +29,9 @@ test("buildAgyArgv uses argv boundaries instead of shell interpolation", () => {
     sandbox: true
   });
 
+  // agy --print reads the prompt from stdin and drops trailing positional
+  // arguments. Including the prompt in argv would also leak it to the OS
+  // process list, so it is intentionally absent here.
   assert.deepEqual(argv, [
     "--print",
     "--print-timeout",
@@ -37,9 +40,9 @@ test("buildAgyArgv uses argv boundaries instead of shell interpolation", () => {
     "/tmp/agy.log",
     "--sandbox",
     "--add-dir",
-    ROOT,
-    prompt
+    ROOT
   ]);
+  assert.ok(!argv.includes(prompt));
 });
 
 test("dangerous permission bypass is explicit and never enabled by default", () => {

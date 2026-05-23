@@ -123,7 +123,10 @@ export function buildAgyArgv(options = {}, supportsPrintTimeout = true) {
     argv.push("--add-dir", dir);
   }
 
-  argv.push(normalized.prompt);
+  // agy v1.0.x reads the prompt from stdin in --print mode and silently
+  // drops any trailing positional argument. Keep the prompt out of argv
+  // (also keeps it off the process command line) — it is piped to the
+  // child's stdin in runJobFile().
   return argv;
 }
 
@@ -324,8 +327,15 @@ export async function runJobFile(jobFile, env = process.env) {
       cwd,
       env,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["pipe", "pipe", "pipe"]
     });
+
+    // agy --print reads the prompt from stdin. Positional args after the
+    // flags are silently dropped, which lets `agy` fall back to an auto
+    // exploration mode whose answers do not address the requested task.
+    if (child.stdin) {
+      child.stdin.end(payload.runOptions.prompt ?? "");
+    }
 
     upsertJob(cwd, {
       id: payload.id,
