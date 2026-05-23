@@ -13,7 +13,7 @@ Claude Code slash command
   -> plugins/agy/commands/*.md
   -> plugins/agy/scripts/agy-companion.mjs
   -> plugins/agy/scripts/lib/agy-runtime.mjs
-  -> agy --print <prompt>
+  -> agy --print (prompt piped via stdin)
   -> job log/result/state
 ```
 
@@ -22,7 +22,7 @@ Codex MCP tool
   -> plugins/agy/scripts/agy-mcp-server.mjs
   -> plugins/agy/scripts/agy-companion.mjs
   -> plugins/agy/scripts/lib/agy-runtime.mjs
-  -> agy --print <prompt>
+  -> agy --print (prompt piped via stdin)
   -> job log/result/state
 ```
 
@@ -53,7 +53,7 @@ Outside Claude Code, the fallback is under `/tmp/agy-companion`.
 ## Security
 
 - `agy` is spawned with `shell: false`.
-- User prompt text is passed as a single argv item.
+- User prompt text is piped through child stdin in print mode.
 - `--dangerously-skip-permissions` is only added when explicitly requested.
 - The default execution mode uses `--sandbox`.
 - State falls outside the repository by default unless Claude Code supplies plugin data storage.

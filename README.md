@@ -94,7 +94,7 @@ The runtime stores job state under `CLAUDE_PLUGIN_DATA/state` when Claude Code p
 ## Security Model
 
 - `agy` is spawned with `shell: false` from runtime code.
-- User prompt text is passed as argv data, not shell-interpolated command text.
+- User prompt text is piped through child stdin in print mode, not passed through argv or shell-interpolated command text.
 - `--dangerously-skip-permissions` is never enabled unless explicitly requested.
 - The default AGY execution mode uses `--sandbox`.
 - Codex MCP arguments are validated before reaching the companion runtime, and the MCP rescue tool does not expose sandbox-disable or dangerous permission-bypass flags.
