@@ -1,0 +1,39 @@
+{
+  "name": "agy",
+  "version": "0.1.0",
+  "description": "Codex plugin for delegating work to the Antigravity CLI (agy).",
+  "author": {
+    "name": "IIC Master"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agy",
+    "antigravity",
+    "codex",
+    "review",
+    "rescue"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "AGY",
+    "shortDescription": "Delegate review and rescue workflows to Antigravity CLI",
+    "longDescription": "Use AGY from Codex to run Antigravity CLI setup checks, review current git changes, delegate bounded rescue tasks, and inspect background job results through the shared companion runtime.",
+    "developerName": "IIC Master",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/iicmaster/antigravity-plugins",
+    "privacyPolicyURL": "https://github.com/iicmaster/antigravity-plugins",
+    "termsOfServiceURL": "https://github.com/iicmaster/antigravity-plugins",
+    "defaultPrompt": [
+      "Use AGY to review this change",
+      "Delegate a bounded rescue task to AGY"
+    ],
+    "brandColor": "#111111",
+    "screenshots": []
+  }
+}

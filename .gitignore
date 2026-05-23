@@ -1,0 +1,25 @@
+node_modules/
+coverage/
+dist/
+build/
+tmp/
+temp/
+*.log
+*.tmp
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
+
+# Local agent/workflow installs generated during development.
+.agent/
+.claude/
+.agents/skills/
+_bmad/
+
+# Runtime state should stay outside the repository.
+plugin-data/
+.agy-state/

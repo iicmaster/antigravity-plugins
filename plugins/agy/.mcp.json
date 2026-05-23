@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "agy": {
+      "command": "bash",
+      "args": [
+        "-lc",
+        "set -e; PLUGIN_ROOT=\"${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}\"; if [ -z \"$PLUGIN_ROOT\" ]; then if [ -f ./scripts/agy-mcp-server.mjs ]; then PLUGIN_ROOT=\"$PWD\"; elif [ -f ./plugins/agy/scripts/agy-mcp-server.mjs ]; then PLUGIN_ROOT=\"$PWD/plugins/agy\"; else for candidate in \"$HOME\"/.codex/plugins/cache/*/agy/*; do if [ -f \"$candidate/scripts/agy-mcp-server.mjs\" ]; then PLUGIN_ROOT=\"$candidate\"; break; fi; done; fi; fi; if [ -z \"$PLUGIN_ROOT\" ]; then echo \"Unable to locate AGY plugin root\" >&2; exit 1; fi; exec node \"$PLUGIN_ROOT/scripts/agy-mcp-server.mjs\""
+      ]
+    }
+  }
+}
