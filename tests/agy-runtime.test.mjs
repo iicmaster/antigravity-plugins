@@ -30,7 +30,6 @@ test("buildAgyArgv uses argv boundaries instead of shell interpolation", () => {
   });
 
   assert.deepEqual(argv, [
-    "--print",
     "--print-timeout",
     "10m0s",
     "--log-file",
@@ -38,6 +37,7 @@ test("buildAgyArgv uses argv boundaries instead of shell interpolation", () => {
     "--sandbox",
     "--add-dir",
     ROOT,
+    "--print",
     prompt
   ]);
 });

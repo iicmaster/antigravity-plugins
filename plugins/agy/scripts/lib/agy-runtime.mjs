@@ -99,7 +99,7 @@ export function goDurationToMilliseconds(duration) {
 
 export function buildAgyArgv(options = {}, supportsPrintTimeout = true) {
   const normalized = normalizeRunOptions(options);
-  const argv = ["--print"];
+  const argv = [];
   if (supportsPrintTimeout) {
     argv.push("--print-timeout", normalized.printTimeout);
   }
@@ -123,7 +123,7 @@ export function buildAgyArgv(options = {}, supportsPrintTimeout = true) {
     argv.push("--add-dir", dir);
   }
 
-  argv.push(normalized.prompt);
+  argv.push("--print", normalized.prompt);
   return argv;
 }
 
