@@ -12,6 +12,16 @@ This repository does not implement Antigravity itself. It wraps a locally instal
 - Shared Node.js runtime scripts for launching, tracking, reading, and cancelling AGY jobs.
 - A focused Node test suite for runtime safety, plugin structure, and MCP behavior.
 
+## Architecture Overview
+
+The current design is one AGY domain plugin with host-specific adapters around a shared runtime core:
+
+- Claude Code uses marketplace metadata plus slash commands.
+- Codex uses marketplace metadata plus a skill and local MCP server.
+- Both hosts call the same companion/runtime scripts for command parsing, job state, cancellation, and `agy --print` execution.
+
+Keep Claude/Codex adapters thin. Do not split the runtime into separate Claude and Codex copies unless the host contracts diverge enough that sharing creates more risk than duplication.
+
 ## Requirements
 
 - Node.js 18.18 or newer.
@@ -20,6 +30,30 @@ This repository does not implement Antigravity itself. It wraps a locally instal
 - Claude Code or Codex, depending on which adapter you want to use.
 
 On some `agy` installs, print mode may report `no active conversation` until an Antigravity conversation has been opened or resumed once. `setup` verifies the binary and required flags; actual delegation still depends on the local `agy` session state.
+
+## AI-Assisted Installation
+
+The quickest path is to paste this repository URL into Claude Code or Codex and ask that host agent to install the plugin for you:
+
+```text
+https://github.com/iicmaster/antigravity-plugins
+```
+
+Example prompt for Claude Code:
+
+```text
+Install the AGY plugin from https://github.com/iicmaster/antigravity-plugins into this Claude Code session. Use the Claude plugin marketplace flow, reload plugins, then run /agy:setup. If you cannot run plugin commands directly, show me the exact manual commands.
+```
+
+Example prompt for Codex:
+
+```text
+Install the AGY plugin from https://github.com/iicmaster/antigravity-plugins into this Codex setup. Use the Codex plugin marketplace flow, verify codex mcp list, then run the agy_setup MCP check if available. If you cannot install directly, show me the exact manual commands.
+```
+
+The requirements above still apply, especially Node.js, Git, a local `agy` binary on your `PATH`, and the host agent you are installing into. This repository installs a host plugin adapter; it does not provide hosted Antigravity access or bypass local permission policies.
+
+The manual commands below are the canonical fallback when you prefer to install directly or your AI agent cannot run plugin install commands.
 
 ## Install In Claude Code
 
@@ -68,17 +102,23 @@ node plugins/agy/scripts/agy-companion.mjs setup
 ## Repository Layout
 
 ```text
-.agents/plugins/               Codex marketplace metadata
-.claude-plugin/                Claude Code marketplace metadata
-docs/                          Architecture and future project notes
-plugins/agy/                   The AGY plugin
-plugins/agy/commands/          Claude Code slash commands
-plugins/agy/skills/agy/        Codex-facing skill instructions
-plugins/agy/scripts/           Shared companion, worker, and MCP runtime
-tests/                         Node.js test suite
+.agents/plugins/                  Codex marketplace metadata
+.claude-plugin/                   Claude Code marketplace metadata
+docs/                             Architecture and future project notes
+plugins/agy/                      The AGY plugin
+plugins/agy/.claude-plugin/       Claude plugin manifest
+plugins/agy/.codex-plugin/        Codex plugin manifest
+plugins/agy/.mcp.json             Codex MCP launcher config
+plugins/agy/commands/             Claude Code slash commands
+plugins/agy/skills/agy/           Codex-facing skill instructions and wrapper
+plugins/agy/prompts/              Shared review/rescue prompt templates
+plugins/agy/scripts/              Shared companion, worker, MCP server, and runtime libraries
+tests/                            Node.js test suite
 ```
 
-Local BMAD, Claude, and agent skill installs are intentionally ignored by git. They are development workflow files, not part of the public plugin contract.
+### Tracked Source vs Local Development Installs
+
+The tracked plugin contract is the marketplace metadata, `plugins/agy`, `docs`, tests, and package metadata. Local BMAD, Claude, Codex, OMX, and agent skill installs are intentionally ignored by git; they are workspace tooling state, not part of the public plugin contract.
 
 ## Development
 

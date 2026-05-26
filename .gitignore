@@ -19,6 +19,7 @@ Thumbs.db
 .claude/
 .agents/skills/
 _bmad/
+.omx/
 
 # Runtime state should stay outside the repository.
 plugin-data/

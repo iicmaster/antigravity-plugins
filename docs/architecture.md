@@ -34,6 +34,16 @@ The Codex MCP server is intentionally thin: it validates structured tool argumen
 
 The Codex MCP launcher resolves the plugin root from `CODEX_PLUGIN_ROOT`, `CLAUDE_PLUGIN_ROOT`, a source checkout, or the local Codex plugin cache under `~/.codex/plugins/cache`. It must not contain machine-local absolute paths.
 
+## Boundary
+
+| Layer | Owns | Must Not Own |
+| --- | --- | --- |
+| Claude adapter | Slash-command metadata, raw argument handoff, Claude-facing command copy | AGY process semantics, job state schema, prompt transport decisions |
+| Codex adapter | Skill instructions, MCP tool schemas, Codex-facing safety limits, local MCP launcher | Duplicate runtime behavior or host-specific copies of job lifecycle logic |
+| Shared companion/runtime | Prompt construction, normalized run options, job files, state/result/cancel behavior, `agy --print` invocation | Host marketplace policy, host UI copy, future AGY-native plugin layout |
+
+Current decision: keep one shared runtime core with thin Claude and Codex adapters. A host-specific adapter may differ at the command or schema boundary, but process execution and job lifecycle behavior should stay shared until there is evidence that the host contracts truly require separate implementations.
+
 ## State
 
 When `CLAUDE_PLUGIN_DATA` is available:
@@ -70,5 +80,7 @@ Extract a central standalone MCP server later when:
 - The command set is stable.
 - Result and cancellation semantics are proven.
 - Multiple clients need the same state and tool contract.
+- The tool schema needs versioning independent of the Claude slash-command surface.
+- Sharing the in-repo runtime creates more compatibility risk than extracting a package.
 
 Until then, keep `agy-runtime.mjs` as the shared core and keep host-specific adapters thin.

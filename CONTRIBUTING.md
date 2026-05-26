@@ -38,7 +38,7 @@ codex mcp list
 - Add or update tests for behavior changes.
 - Update docs when installation, commands, MCP tools, or safety behavior changes.
 - Run `npm test` before opening a PR.
-- Do not commit local workflow folders such as `.agent/`, `.claude/`, `.agents/skills/`, or `_bmad/`.
+- Do not commit local workflow folders such as `.agent/`, `.claude/`, `.agents/skills/`, `_bmad/`, or `.omx/`.
 
 ## Security-Sensitive Changes
 
