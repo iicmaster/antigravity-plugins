@@ -4,6 +4,12 @@ Open-source Claude Code and Codex plugin adapters that delegate review and rescu
 
 This repository does not implement Antigravity itself. It wraps a locally installed `agy` binary so another coding agent can ask Antigravity for a second review, adversarial pass, or bounded rescue task.
 
+## Status
+
+Developer Preview. This project is ready for developers who already have a working local Antigravity CLI (`agy`) and want Claude Code or Codex adapters for review and rescue workflows.
+
+It is not a general-availability hosted product. Users still need local `agy` authentication, a usable local `agy` session, and the host agent they plan to install into.
+
 ## What Is Included
 
 - Claude Code plugin marketplace metadata in `.claude-plugin/`.
@@ -99,6 +105,16 @@ If your non-interactive Codex policy cannot approve MCP tools, verify the local 
 node plugins/agy/scripts/agy-companion.mjs setup
 ```
 
+## Troubleshooting
+
+### `no active conversation`
+
+If setup succeeds but a review or rescue command reports `no active conversation`, open or resume an Antigravity conversation once through your local `agy` installation, then rerun the AGY command. The plugin can verify that the binary and flags exist, but it cannot create or authenticate an Antigravity session for you.
+
+### Multiple Installed Copies
+
+If behavior does not match the current checkout after reinstalling, verify which marketplace or plugin cache your host is loading. Claude Code and Codex may keep their own installed plugin copies, so updating a source checkout does not always update the active host install.
+
 ## Repository Layout
 
 ```text
@@ -130,6 +146,17 @@ node plugins/agy/scripts/agy-mcp-server.mjs
 ```
 
 The runtime stores job state under `CLAUDE_PLUGIN_DATA/state` when Claude Code provides that environment variable. Outside Claude Code it falls back to `/tmp/agy-companion/<workspace-hash>/`.
+
+## Developer Preview Release Gate
+
+The current developer-preview gate is:
+
+- Node.js 18.18 or newer.
+- Local Unix-like shell environment for the Codex MCP launcher.
+- Local `agy` binary exposing print, sandbox, add-dir, print-timeout, continue, and conversation flags.
+- `npm test`.
+- `node plugins/agy/scripts/agy-companion.mjs setup --json`.
+- Fresh Claude Code and Codex host install smoke tests before tagging a release.
 
 ## Security Model
 

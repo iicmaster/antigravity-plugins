@@ -19,9 +19,11 @@ If private reporting is not available, contact the maintainer through the GitHub
 ## Security Expectations
 
 - No hardcoded secrets.
-- No command construction from untrusted shell strings.
-- No default use of `--dangerously-skip-permissions`.
-- MCP input must be validated before runtime execution.
-- Error output should not expose local secrets or credentials.
+- Spawn `agy` with argv arrays and `shell: false`; do not construct shell strings from user text.
+- Pipe `agy --print` prompt text through child stdin; do not pass the prompt as a positional argv item or log it as part of the command line.
+- Keep AGY sandboxing enabled by default. `--dangerously-skip-permissions` and sandbox-disable behavior must remain explicit opt-ins and must not be exposed through the Codex MCP rescue tool.
+- Validate MCP input before runtime execution and validate again inside the stdio server before invoking the companion runtime.
+- Keep job state and logs outside the repository by default (`CLAUDE_PLUGIN_DATA/state` when provided, otherwise the runtime fallback outside the checkout).
+- Error output should not expose local secrets, credentials, or full prompt text unless the user explicitly requested that diagnostic detail.
 
 Security fixes may be released without waiting for unrelated refactors or feature work.

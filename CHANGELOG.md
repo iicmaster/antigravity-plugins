@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Added
+
+- AI-assisted installation guidance for Claude Code and Codex users.
+- Codex project instructions in `AGENTS.md` for shared-runtime boundaries, local state hygiene, and verification commands.
+- Developer Preview status, troubleshooting guidance, and a verification matrix for public onboarding.
+- `.npmignore` rules so repository guidance and local workflow state do not ship in the npm tarball.
+
+### Changed
+
+- Expanded architecture and security docs to reflect stdin prompt transport, thin host adapters, and shared companion/runtime ownership.
+- Clarified local workflow folders such as `.omx/` should stay out of commits.
+
 ## 0.1.0 - 2026-05-23
 
 ### Added

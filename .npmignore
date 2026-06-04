@@ -1,0 +1,26 @@
+node_modules/
+coverage/
+dist/
+build/
+tmp/
+temp/
+*.log
+*.tmp
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
+
+# Repository guidance and local workflow installs are useful in source checkouts,
+# but they are not part of the plugin payload users install.
+AGENTS.md
+.agent/
+.claude/
+.agents/skills/
+_bmad/
+.omx/
+plugin-data/
+.agy-state/

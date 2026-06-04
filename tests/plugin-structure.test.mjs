@@ -78,6 +78,26 @@ test("package metadata is ready for public open-source release", () => {
   assert.match(manifest.description, /open-source/i);
 });
 
+test("developer preview docs state local agy prerequisites and known session failure", () => {
+  const readme = readText("README.md");
+
+  assert.match(readme, /Developer Preview/i);
+  assert.match(readme, /working local Antigravity CLI \(`agy`\)/i);
+  assert.match(readme, /not a general-availability hosted product/i);
+  assert.match(readme, /no active conversation/i);
+});
+
+test("npm payload excludes repo guidance and local workflow state", () => {
+  const npmIgnore = readText(".npmignore");
+
+  assert.match(npmIgnore, /^AGENTS\.md$/m);
+  assert.match(npmIgnore, /^_bmad\/$/m);
+  assert.match(npmIgnore, /^\.omx\/$/m);
+  assert.match(npmIgnore, /^plugin-data\/$/m);
+  assert.match(npmIgnore, /^\.agy-state\/$/m);
+  assert.doesNotMatch(npmIgnore, /^\.agents\/$/m);
+});
+
 test("Claude commands route through the shared agy companion script", () => {
   const commands = [
     "setup",
