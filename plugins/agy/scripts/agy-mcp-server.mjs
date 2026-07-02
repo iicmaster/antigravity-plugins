@@ -5,9 +5,17 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { goDurationToMilliseconds } from "./lib/agy-runtime.mjs";
+
 const PLUGIN_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const COMPANION = path.join(PLUGIN_ROOT, "scripts", "agy-companion.mjs");
 const GO_DURATION_PATTERN = /^(?:\d+(?:\.\d+)?(?:ns|us|µs|ms|s|m|h))+$/;
+// spawnSync in runCompanion is synchronous: without a timeout a foreground
+// review/rescue blocks the MCP tool call until agy returns (up to the companion
+// 10m default print-timeout), which shows to the host agent as a hang.
+const FAST_OP_TIMEOUT_MS = 60_000;
+const RUN_TIMEOUT_GRACE_MS = 30_000;
+const DEFAULT_RUN_TIMEOUT_MS = 600_000; // mirrors the companion DEFAULT_PRINT_TIMEOUT of 10m0s
 const SAFE_REF_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/@-]{0,127}$/;
 const SAFE_JOB_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
@@ -182,14 +190,28 @@ function addCommonRunArgs(argv, args) {
   }
 }
 
-function runCompanion(command, argv = []) {
+function runBackstopMs(args) {
+  const timeout = optionalDuration(args);
+  const jobMs = timeout ? goDurationToMilliseconds(timeout) : DEFAULT_RUN_TIMEOUT_MS;
+  return jobMs + RUN_TIMEOUT_GRACE_MS;
+}
+
+function runCompanion(command, argv = [], timeoutMs = FAST_OP_TIMEOUT_MS) {
   const result = spawnSync(process.execPath, [COMPANION, command, ...argv], {
     cwd: process.cwd(),
     env: process.env,
     encoding: "utf8",
-    shell: false
+    shell: false,
+    timeout: timeoutMs,
+    killSignal: "SIGKILL"
   });
   const text = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  if (result.error?.code === "ETIMEDOUT") {
+    return {
+      content: [{ type: "text", text: `${text}agy MCP backstop: the companion did not return within ${Math.round(timeoutMs / 1000)}s and was killed. Use background: true (then agy_status / agy_result) or a shorter timeout.\n` }],
+      isError: true
+    };
+  }
   return {
     content: [{ type: "text", text: text || "(no output)\n" }],
     isError: Boolean(result.error) || result.status !== 0
@@ -242,11 +264,11 @@ function callTool(name, rawArgs = {}) {
       rejectUnknown(args, ["jobId"]);
       return runCompanion("cancel", jobArg(args, true));
     case "agy_review":
-      return runCompanion("review", reviewArgs(args));
+      return runCompanion("review", reviewArgs(args), runBackstopMs(args));
     case "agy_adversarial_review":
-      return runCompanion("adversarial-review", reviewArgs(args));
+      return runCompanion("adversarial-review", reviewArgs(args), runBackstopMs(args));
     case "agy_rescue":
-      return runCompanion("rescue", rescueArgs(args));
+      return runCompanion("rescue", rescueArgs(args), runBackstopMs(args));
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
