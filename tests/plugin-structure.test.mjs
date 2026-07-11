@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -87,6 +89,18 @@ test("developer preview docs state local agy prerequisites and known session fai
   assert.match(readme, /no active conversation/i);
 });
 
+test("developer preview docs identify implicit stdin print-mode transport limits", () => {
+  const readme = readText("README.md");
+  const architecture = readText("docs/architecture.md");
+  const agents = readText("AGENTS.md");
+
+  assert.match(readme, /setup --smoke/i);
+  assert.match(readme, /without the `--print` flag/i);
+  assert.match(architecture, /implicit non-interactive mode/i);
+  assert.match(architecture, /not equivalent to Codex app-server/i);
+  assert.match(agents, /without passing `--print`/i);
+});
+
 test("npm payload excludes repo guidance and local workflow state", () => {
   const npmIgnore = readText(".npmignore");
 
@@ -96,6 +110,29 @@ test("npm payload excludes repo guidance and local workflow state", () => {
   assert.match(npmIgnore, /^plugin-data\/$/m);
   assert.match(npmIgnore, /^\.agy-state\/$/m);
   assert.doesNotMatch(npmIgnore, /^\.agents\/$/m);
+});
+
+test("npm payload excludes local Serena project state", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-pack-"));
+  fs.writeFileSync(path.join(cwd, ".npmignore"), readText(".npmignore"), "utf8");
+  fs.writeFileSync(
+    path.join(cwd, "package.json"),
+    JSON.stringify({ name: "agy-pack-fixture", version: "1.0.0" }),
+    "utf8"
+  );
+  fs.writeFileSync(path.join(cwd, "included.txt"), "included\n", "utf8");
+  fs.mkdirSync(path.join(cwd, ".serena"));
+  fs.writeFileSync(path.join(cwd, ".serena", "project.yml"), "project_name: fixture\n", "utf8");
+
+  const result = spawnSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
+    cwd,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const files = JSON.parse(result.stdout)[0].files.map((entry) => entry.path);
+  assert.ok(files.includes("included.txt"));
+  assert.ok(!files.some((file) => file === ".serena" || file.startsWith(".serena/")));
 });
 
 test("Claude commands route through the shared agy companion script", () => {

@@ -18,11 +18,16 @@ import {
 import { collectGitReviewContext } from "../plugins/agy/scripts/lib/git-context.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const COMPANION = path.join(ROOT, "plugins", "agy", "scripts", "agy-companion.mjs");
 
-function writeFakeAgy(binDir, script) {
+function writeFakeAgy(binDir, script, version = "1.1.1") {
   fs.mkdirSync(binDir, { recursive: true });
   const fakeAgy = path.join(binDir, "agy");
-  fs.writeFileSync(fakeAgy, script, "utf8");
+  const source = script.replace(
+    "#!/usr/bin/env node\n",
+    `#!/usr/bin/env node\nif (process.argv.includes("--version")) {\n  console.log(${JSON.stringify(version)});\n  process.exit(0);\n}\n`
+  );
+  fs.writeFileSync(fakeAgy, source, "utf8");
   fs.chmodSync(fakeAgy, 0o755);
   return fakeAgy;
 }
@@ -35,7 +40,7 @@ function fakeAgyEnv(cwd, binDir) {
   };
 }
 
-test("buildAgyArgv emits only flags; the prompt is piped via stdin", () => {
+test("buildAgyArgv emits only non-prompt flags for implicit stdin print mode", () => {
   const prompt = 'review this"; rm -rf / #';
   const argv = buildAgyArgv({
     prompt,
@@ -45,11 +50,10 @@ test("buildAgyArgv emits only flags; the prompt is piped via stdin", () => {
     sandbox: true
   });
 
-  // agy --print reads the prompt from stdin and drops trailing positional
-  // arguments. Including the prompt in argv would also leak it to the OS
-  // process list, so it is intentionally absent here.
+  // AGY 1.1.1 auto-enters non-interactive print mode when stdin is piped and
+  // no --print flag is present. A bare --print would consume the next flag as
+  // its required prompt value.
   assert.deepEqual(argv, [
-    "--print",
     "--print-timeout",
     "10m0s",
     "--log-file",
@@ -58,6 +62,8 @@ test("buildAgyArgv emits only flags; the prompt is piped via stdin", () => {
     "--add-dir",
     ROOT
   ]);
+  assert.ok(!argv.includes("--print"));
+  assert.ok(!argv.some((value) => value.startsWith("--print=")));
   assert.ok(!argv.includes(prompt));
 });
 
@@ -123,7 +129,10 @@ setTimeout(() => process.stdout.write("late output"), 1000);
 `,
   );
 
-  const env = fakeAgyEnv(cwd, binDir);
+  const env = {
+    ...fakeAgyEnv(cwd, binDir),
+    AGY_COMPANION_WRAPPER_TIMEOUT_GRACE_MS: "10"
+  };
   const payload = createJob(cwd, {
     kind: "rescue",
     prompt: "x",
@@ -138,7 +147,223 @@ setTimeout(() => process.stdout.write("late output"), 1000);
   assert.match(fs.readFileSync(payload.resultFile, "utf8"), /timed out after 100ms/i);
 });
 
-test("runJobFile pipes the prompt through stdin without leaking it to argv or command logs", async () => {
+test("runJobFile gives agy print-timeout a grace window before wrapper hard-kill", async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-timeout-grace-"));
+  const binDir = path.join(cwd, "bin");
+  writeFakeAgy(
+    binDir,
+    `#!/usr/bin/env node
+if (process.argv.includes("--help")) {
+  console.log("--print --print-timeout --sandbox --add-dir --continue --conversation");
+  process.exit(0);
+}
+process.stdin.resume();
+process.stdin.on("data", () => {});
+process.stdin.on("end", () => {
+  setTimeout(() => {
+    process.stderr.write("Error: timed out waiting for response\\n");
+    process.exit(1);
+  }, 350);
+});
+`
+  );
+
+  const env = {
+    ...fakeAgyEnv(cwd, binDir),
+    AGY_COMPANION_WRAPPER_TIMEOUT_GRACE_MS: "500"
+  };
+  const payload = createJob(cwd, {
+    kind: "rescue",
+    prompt: "x",
+    addDirs: [cwd],
+    printTimeout: "300ms",
+    sandbox: true
+  }, env);
+
+  const result = await runJobFile(payload.jobFile, env);
+
+  assert.equal(result.status, "failed");
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.signal, null);
+  assert.match(result.stderr, /timed out waiting for response/i);
+  assert.doesNotMatch(fs.readFileSync(payload.resultFile, "utf8"), /agy timed out after 300ms/i);
+});
+
+test("runJobFile marks timed-out jobs with captured stdout as partial", async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-partial-timeout-"));
+  const binDir = path.join(cwd, "bin");
+  writeFakeAgy(
+    binDir,
+    `#!/usr/bin/env node
+if (process.argv.includes("--help")) {
+  console.log("--print --print-timeout --sandbox --add-dir --continue --conversation");
+  process.exit(0);
+}
+process.stdout.write("partial answer\\n");
+setTimeout(() => {}, 1000);
+`
+  );
+
+  const env = {
+    ...fakeAgyEnv(cwd, binDir),
+    AGY_COMPANION_WRAPPER_TIMEOUT_GRACE_MS: "50"
+  };
+  const payload = createJob(cwd, {
+    kind: "rescue",
+    prompt: "x",
+    addDirs: [cwd],
+    printTimeout: "300ms",
+    sandbox: true
+  }, env);
+
+  const result = await runJobFile(payload.jobFile, env);
+  const resultText = fs.readFileSync(payload.resultFile, "utf8");
+
+  assert.equal(result.status, "partial");
+  assert.match(resultText, /partial answer/);
+  assert.match(resultText, /agy timed out after 300ms/i);
+});
+
+test("setup smoke verifies print mode beyond help flags", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-setup-smoke-"));
+  const binDir = path.join(cwd, "bin");
+  writeFakeAgy(
+    binDir,
+    `#!/usr/bin/env node
+if (process.argv.includes("--help")) {
+  console.log("--print --print-timeout --sandbox --add-dir --continue --conversation");
+  process.exit(0);
+}
+let stdin = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  stdin += chunk;
+});
+process.stdin.on("end", () => {
+  process.stdout.write(stdin.includes("AGY_SMOKE_OK") ? "AGY_SMOKE_OK\\n" : "unexpected\\n");
+});
+`
+  );
+
+  const result = spawnSync(process.execPath, [COMPANION, "setup", "--json", "--smoke", "--timeout", "50ms"], {
+    cwd,
+    env: fakeAgyEnv(cwd, binDir),
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.ready, true);
+  assert.equal(report.smoke.ok, true);
+  assert.equal(report.smoke.timeout, "50ms");
+  assert.match(report.smoke.stdout, /AGY_SMOKE_OK/);
+});
+
+test("setup fails closed when required AGY capabilities are missing", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-setup-degraded-"));
+  const binDir = path.join(cwd, "bin");
+  writeFakeAgy(
+    binDir,
+    `#!/usr/bin/env node
+if (process.argv.includes("--help")) {
+  console.log("--print");
+  process.exit(0);
+}
+process.stdin.resume();
+process.stdin.on("end", () => process.stdout.write("AGY_SMOKE_OK\\n"));
+`
+  );
+
+  const result = spawnSync(
+    process.execPath,
+    [COMPANION, "setup", "--json", "--smoke", "--timeout", "50ms"],
+    {
+      cwd,
+      env: fakeAgyEnv(cwd, binDir),
+      encoding: "utf8"
+    }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.ready, false);
+  assert.ok(report.missingFeatures.includes("sandbox"));
+  assert.ok(report.missingFeatures.includes("addDir"));
+  assert.ok(report.missingFeatures.includes("printTimeout"));
+  assert.equal(report.smoke.ok, false);
+  assert.equal(report.smoke.skipped, true);
+  assert.match(report.smoke.reason, /sandbox mode is unavailable/i);
+});
+
+test("setup rejects AGY versions older than the implicit stdin baseline", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-setup-version-"));
+  const binDir = path.join(cwd, "bin");
+  writeFakeAgy(
+    binDir,
+    `#!/usr/bin/env node
+if (process.argv.includes("--help")) {
+  console.log("--print --print-timeout --sandbox --add-dir --continue --conversation");
+  process.exit(0);
+}
+`,
+    "1.1.0"
+  );
+
+  const result = spawnSync(
+    process.execPath,
+    [COMPANION, "setup", "--json", "--smoke", "--timeout", "50ms"],
+    {
+      cwd,
+      env: fakeAgyEnv(cwd, binDir),
+      encoding: "utf8"
+    }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.ready, false);
+  assert.equal(report.agy.version, "1.1.0");
+  assert.equal(report.agy.minimumVersion, "1.1.1");
+  assert.equal(report.agy.versionSupported, false);
+  assert.ok(report.missingFeatures.includes("version>=1.1.1"));
+  assert.equal(report.smoke.skipped, true);
+  assert.match(report.smoke.reason, /agy 1\.1\.1 or newer is required/i);
+});
+
+test("runJobFile refuses unsupported AGY versions before launching a prompt", async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-job-version-"));
+  const binDir = path.join(cwd, "bin");
+  const marker = path.join(cwd, "prompt-launched");
+  writeFakeAgy(
+    binDir,
+    `#!/usr/bin/env node
+import fs from "node:fs";
+if (process.argv.includes("--help")) {
+  console.log("--print --print-timeout --sandbox --add-dir --continue --conversation");
+  process.exit(0);
+}
+fs.writeFileSync(${JSON.stringify(marker)}, "launched");
+`,
+    "1.1.0"
+  );
+
+  const env = fakeAgyEnv(cwd, binDir);
+  const payload = createJob(cwd, {
+    kind: "rescue",
+    prompt: "inspect safely",
+    addDirs: [cwd],
+    printTimeout: "5s",
+    sandbox: true
+  }, env);
+
+  const result = await runJobFile(payload.jobFile, env);
+
+  assert.equal(result.status, "failed");
+  assert.match(result.stderr, /agy 1\.1\.1 or newer is required/i);
+  assert.ok(!fs.existsSync(marker));
+});
+
+test("runJobFile pipes the prompt through stdin without command-line leakage", async () => {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-stdin-"));
   const binDir = path.join(cwd, "bin");
   writeFakeAgy(
@@ -172,11 +397,13 @@ process.stdin.on("end", () => {
   const result = await runJobFile(payload.jobFile, env);
   const output = JSON.parse(result.stdout);
   const log = fs.readFileSync(payload.logFile, "utf8");
+  const commandLine = log.split("\n", 1)[0];
 
   assert.equal(result.status, "succeeded");
   assert.equal(output.stdin, prompt);
   assert.ok(!output.argv.includes(prompt));
-  assert.ok(!log.includes(prompt));
+  assert.ok(!output.argv.includes("--print"));
+  assert.ok(!commandLine.includes("keep me off argv"));
 });
 
 test("runJobFile survives stdin EPIPE when agy exits before draining a large prompt", () => {

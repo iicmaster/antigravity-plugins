@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 
 - Expanded architecture and security docs to reflect stdin prompt transport, thin host adapters, and shared companion/runtime ownership.
 - Clarified local workflow folders such as `.omx/` should stay out of commits.
+- Require AGY 1.1.1 or newer and use implicit non-interactive stdin mode without a bare `--print` flag.
 
 ## 0.1.0 - 2026-05-23
 

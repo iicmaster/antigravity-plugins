@@ -8,7 +8,7 @@ This repository does not implement Antigravity itself. It wraps a locally instal
 
 Developer Preview. This project is ready for developers who already have a working local Antigravity CLI (`agy`) and want Claude Code or Codex adapters for review and rescue workflows.
 
-It is not a general-availability hosted product. Users still need local `agy` authentication, a usable local `agy` session, and the host agent they plan to install into.
+It is not a general-availability hosted product. Users still need local `agy` authentication, a usable local `agy` session, and the host agent they plan to install into. The current AGY integration pipes prompt text through stdin without the `--print` flag, allowing AGY 1.1.1 to enter implicit non-interactive mode without exposing the prompt in process argv. This CLI transport is not equivalent to Codex's structured `app-server` runtime.
 
 ## What Is Included
 
@@ -24,7 +24,7 @@ The current design is one AGY domain plugin with host-specific adapters around a
 
 - Claude Code uses marketplace metadata plus slash commands.
 - Codex uses marketplace metadata plus a skill and local MCP server.
-- Both hosts call the same companion/runtime scripts for command parsing, job state, cancellation, and `agy --print` execution.
+- Both hosts call the same companion/runtime scripts for command parsing, job state, cancellation, and implicit non-interactive AGY execution.
 
 Keep Claude/Codex adapters thin. Do not split the runtime into separate Claude and Codex copies unless the host contracts diverge enough that sharing creates more risk than duplication.
 
@@ -32,10 +32,10 @@ Keep Claude/Codex adapters thin. Do not split the runtime into separate Claude a
 
 - Node.js 18.18 or newer.
 - Git.
-- A working Antigravity CLI named `agy` on your `PATH`.
+- Antigravity CLI `agy` 1.1.1 or newer on your `PATH`.
 - Claude Code or Codex, depending on which adapter you want to use.
 
-On some `agy` installs, print mode may report `no active conversation` until an Antigravity conversation has been opened or resumed once. `setup` verifies the binary and required flags; actual delegation still depends on the local `agy` session state.
+On some `agy` installs, print mode may report `no active conversation` until an Antigravity conversation has been opened or resumed once. `setup` verifies the minimum CLI version and required flags; actual delegation still depends on the local `agy` session state. Use `setup --smoke` when you need proof that implicit stdin mode can complete a minimal local run, not just that the expected flags exist.
 
 ## AI-Assisted Installation
 
@@ -76,7 +76,7 @@ For local development, replace the GitHub URL with your local checkout path.
 
 ### Claude Commands
 
-- `/agy:setup` checks whether `agy` is installed and exposes the flags this plugin needs.
+- `/agy:setup` checks whether `agy` is installed and exposes the flags this plugin needs. Add `--smoke` to run a minimal print-mode completion check.
 - `/agy:review` sends the current git context to `agy` for read-only review.
 - `/agy:adversarial-review` sends a stricter review prompt focused on hidden risks.
 - `/agy:rescue` delegates a bounded investigation or fix request to `agy`.
@@ -96,13 +96,13 @@ For interactive Codex sessions, ask Codex to use an AGY MCP tool such as `agy_se
 
 ```bash
 codex exec -C <repo-path> --ephemeral \
-  'Use the AGY MCP tool agy_setup. Do not modify files. Reply with the exact tool output.'
+  'Use the AGY MCP tool agy_setup with smoke=true and timeout=30s. Do not modify files. Reply with the exact tool output.'
 ```
 
 If your non-interactive Codex policy cannot approve MCP tools, verify the local runtime directly instead of disabling sandbox protections just for installation testing:
 
 ```bash
-node plugins/agy/scripts/agy-companion.mjs setup
+node plugins/agy/scripts/agy-companion.mjs setup --smoke
 ```
 
 ## Troubleshooting
@@ -142,6 +142,7 @@ The tracked plugin contract is the marketplace metadata, `plugins/agy`, `docs`, 
 npm test
 node plugins/agy/scripts/agy-companion.mjs setup
 node plugins/agy/scripts/agy-companion.mjs setup --json
+node plugins/agy/scripts/agy-companion.mjs setup --smoke --json
 node plugins/agy/scripts/agy-mcp-server.mjs
 ```
 
@@ -153,15 +154,16 @@ The current developer-preview gate is:
 
 - Node.js 18.18 or newer.
 - Local Unix-like shell environment for the Codex MCP launcher.
-- Local `agy` binary exposing print, sandbox, add-dir, print-timeout, continue, and conversation flags.
+- Local `agy` 1.1.1 or newer exposing print, sandbox, add-dir, print-timeout, continue, and conversation flags.
 - `npm test`.
 - `node plugins/agy/scripts/agy-companion.mjs setup --json`.
+- `node plugins/agy/scripts/agy-companion.mjs setup --smoke --json` when validating a release candidate against a real local `agy` install.
 - Fresh Claude Code and Codex host install smoke tests before tagging a release.
 
 ## Security Model
 
 - `agy` is spawned with `shell: false` from runtime code.
-- User prompt text is piped through child stdin in print mode, not passed through argv or shell-interpolated command text.
+- User prompt text is piped through child stdin without passing `--print`; it is not placed in argv or shell-interpolated command text.
 - `--dangerously-skip-permissions` is never enabled unless explicitly requested.
 - The default AGY execution mode uses `--sandbox`.
 - Codex MCP arguments are validated before reaching the companion runtime, and the MCP rescue tool does not expose sandbox-disable or dangerous permission-bypass flags.
@@ -171,6 +173,7 @@ The current developer-preview gate is:
 
 - This is a wrapper around a local `agy` binary. It does not provide hosted Antigravity access.
 - AGY authentication, availability, and model behavior are controlled by the user's local Antigravity installation.
+- The implicit stdin transport depends on AGY's non-TTY behavior and may change upstream. `setup --smoke` is the compatibility gate; the companion also keeps a wrapper timeout, reports captured stdout from timed-out runs as partial output, and separates its hard-kill timeout from AGY's own `--print-timeout`.
 - The Codex MCP adapter is local to this plugin. A standalone shared MCP package may be extracted later if the tool contract stabilizes.
 - The current release targets Unix-like shells for the Codex MCP launcher.
 

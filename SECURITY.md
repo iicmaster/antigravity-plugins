@@ -20,7 +20,7 @@ If private reporting is not available, contact the maintainer through the GitHub
 
 - No hardcoded secrets.
 - Spawn `agy` with argv arrays and `shell: false`; do not construct shell strings from user text.
-- Pipe `agy --print` prompt text through child stdin; do not pass the prompt as a positional argv item or log it as part of the command line.
+- Omit `--print` and pipe prompt text through child stdin so it never enters process argv or the command log.
 - Keep AGY sandboxing enabled by default. `--dangerously-skip-permissions` and sandbox-disable behavior must remain explicit opt-ins and must not be exposed through the Codex MCP rescue tool.
 - Validate MCP input before runtime execution and validate again inside the stdio server before invoking the companion runtime.
 - Keep job state and logs outside the repository by default (`CLAUDE_PLUGIN_DATA/state` when provided, otherwise the runtime fallback outside the checkout).

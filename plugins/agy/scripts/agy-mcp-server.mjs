@@ -5,6 +5,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { FAST_OP_TIMEOUT_MS, setupBackstopMs } from "./lib/agy-mcp-policy.mjs";
 import { goDurationToMilliseconds } from "./lib/agy-runtime.mjs";
 
 const PLUGIN_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -13,7 +14,6 @@ const GO_DURATION_PATTERN = /^(?:\d+(?:\.\d+)?(?:ns|us|µs|ms|s|m|h))+$/;
 // spawnSync in runCompanion is synchronous: without a timeout a foreground
 // review/rescue blocks the MCP tool call until agy returns (up to the companion
 // 10m default print-timeout), which shows to the host agent as a hang.
-const FAST_OP_TIMEOUT_MS = 60_000;
 const RUN_TIMEOUT_GRACE_MS = 30_000;
 const DEFAULT_RUN_TIMEOUT_MS = 600_000; // mirrors the companion DEFAULT_PRINT_TIMEOUT of 10m0s
 const SAFE_REF_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/@-]{0,127}$/;
@@ -26,7 +26,10 @@ const tools = [
     inputSchema: {
       type: "object",
       additionalProperties: false,
-      properties: {}
+      properties: {
+        smoke: { type: "boolean", description: "Run a minimal print-mode completion check." },
+        timeout: { type: "string", description: "Go duration such as 30s or 10m0s for the smoke check." }
+      }
     }
   },
   {
@@ -235,7 +238,20 @@ function reviewArgs(args) {
   }
   const focus = optionalString(args, "focus", { max: 4000 });
   if (focus) {
-    argv.push(focus);
+    argv.push("--", focus);
+  }
+  return argv;
+}
+
+function setupArgs(args) {
+  rejectUnknown(args, ["smoke", "timeout"]);
+  const argv = [];
+  if (optionalBoolean(args, "smoke")) {
+    argv.push("--smoke");
+  }
+  const timeout = optionalDuration(args);
+  if (timeout) {
+    argv.push("--timeout", timeout);
   }
   return argv;
 }
@@ -244,16 +260,17 @@ function rescueArgs(args) {
   rejectUnknown(args, ["task", "timeout", "background"]);
   const argv = [];
   addCommonRunArgs(argv, args);
-  argv.push(requiredString(args, "task", { max: 8000 }));
+  argv.push("--", requiredString(args, "task", { max: 8000 }));
   return argv;
 }
 
 function callTool(name, rawArgs = {}) {
   const args = assertObject(rawArgs);
   switch (name) {
-    case "agy_setup":
-      rejectUnknown(args, []);
-      return runCompanion("setup");
+    case "agy_setup": {
+      const argv = setupArgs(args);
+      return runCompanion("setup", argv, setupBackstopMs(args));
+    }
     case "agy_status":
       rejectUnknown(args, ["jobId"]);
       return runCompanion("status", jobArg(args));

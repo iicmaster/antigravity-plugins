@@ -13,6 +13,7 @@ import {
   listJobs,
   readJobPayload,
   resolveStateDir,
+  runPrintSmoke,
   runJobFile,
   startBackgroundWorker,
   upsertJob
@@ -81,12 +82,17 @@ function parseArgs(argv) {
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
     switch (token) {
+      case "--":
+        positionals.push(...tokens.slice(index + 1));
+        index = tokens.length;
+        break;
       case "--json":
       case "--wait":
       case "--background":
       case "--no-sandbox":
       case "--dangerously-skip-permissions":
       case "--continue":
+      case "--smoke":
         options[token.slice(2)] = true;
         break;
       case "--base":
@@ -124,16 +130,24 @@ function renderSetup(report) {
   const lines = [
     `AGY ready: ${report.ready ? "yes" : "no"}`,
     `agy available: ${report.agy.available ? "yes" : "no"}`,
+    `agy version: ${report.agy.version ?? "unknown"} (minimum ${report.agy.minimumVersion})`,
     `state dir: ${report.stateDir}`,
     ""
   ];
   if (report.missingFeatures.length > 0) {
-    lines.push(`Missing expected flags: ${report.missingFeatures.join(", ")}`, "");
+    lines.push(`Missing requirements: ${report.missingFeatures.join(", ")}`, "");
   }
   if (!report.ready) {
     lines.push("Next steps:");
-    lines.push("- Install or authenticate Antigravity CLI, then rerun `/agy:setup`.");
+    lines.push("- Install, update, or authenticate Antigravity CLI, then rerun `/agy:setup`.");
     lines.push("- If print mode reports no active conversation, open or resume an AGY conversation once and retry.");
+  }
+  if (report.smoke) {
+    lines.push("");
+    lines.push(`print smoke: ${report.smoke.ok ? "pass" : report.smoke.skipped ? "skipped" : "fail"}`);
+    if (!report.smoke.ok && report.smoke.reason) {
+      lines.push(`smoke detail: ${report.smoke.reason}`);
+    }
   }
   return `${lines.join("\n")}\n`;
 }
@@ -145,17 +159,30 @@ async function handleSetup(argv) {
   const missingFeatures = Object.entries(agy.supports)
     .filter(([, supported]) => !supported)
     .map(([name]) => name);
+  if (!agy.versionSupported) {
+    missingFeatures.unshift(`version>=${agy.minimumVersion}`);
+  }
   const report = {
-    ready: agy.available && agy.supports.print,
+    ready: agy.available && missingFeatures.length === 0,
     agy: {
       available: agy.available,
       status: agy.status,
       error: agy.error,
+      version: agy.version,
+      minimumVersion: agy.minimumVersion,
+      versionSupported: agy.versionSupported,
       supports: agy.supports
     },
     missingFeatures,
     stateDir: resolveStateDir(cwd)
   };
+  if (options.smoke) {
+    report.smoke = await runPrintSmoke(cwd, process.env, {
+      agy,
+      timeout: options.timeout ?? "30s"
+    });
+    report.ready = report.ready && report.smoke.ok;
+  }
   output(options.json ? report : renderSetup(report), Boolean(options.json));
 }
 

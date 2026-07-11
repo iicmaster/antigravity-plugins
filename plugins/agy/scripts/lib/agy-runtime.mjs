@@ -7,8 +7,12 @@ import path from "node:path";
 const STATE_FILE_NAME = "state.json";
 const JOBS_DIR_NAME = "jobs";
 const DEFAULT_PRINT_TIMEOUT = "10m0s";
+const DEFAULT_WRAPPER_TIMEOUT_GRACE_MS = 2000;
+const MIN_AGY_VERSION = "1.1.1";
 const GO_DURATION_PATTERN = /^(?:\d+(?:\.\d+)?(?:ns|us|µs|ms|s|m|h))+$/;
 const FORCE_KILL_GRACE_MS = 2000;
+const PRINT_SMOKE_SENTINEL = "AGY_SMOKE_OK";
+const PRINT_SMOKE_PROMPT = `Reply with exactly ${PRINT_SMOKE_SENTINEL} and do not run tools.`;
 
 function nowIso() {
   return new Date().toISOString();
@@ -97,9 +101,21 @@ export function goDurationToMilliseconds(duration) {
   return Math.ceil(total);
 }
 
+function wrapperTimeoutGraceMs(env = process.env) {
+  const raw = env.AGY_COMPANION_WRAPPER_TIMEOUT_GRACE_MS;
+  if (raw == null || raw === "") {
+    return DEFAULT_WRAPPER_TIMEOUT_GRACE_MS;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return DEFAULT_WRAPPER_TIMEOUT_GRACE_MS;
+  }
+  return Math.ceil(parsed);
+}
+
 export function buildAgyArgv(options = {}, supportsPrintTimeout = true) {
   const normalized = normalizeRunOptions(options);
-  const argv = ["--print"];
+  const argv = [];
   if (supportsPrintTimeout) {
     argv.push("--print-timeout", normalized.printTimeout);
   }
@@ -123,10 +139,9 @@ export function buildAgyArgv(options = {}, supportsPrintTimeout = true) {
     argv.push("--add-dir", dir);
   }
 
-  // agy v1.0.x reads the prompt from stdin in --print mode and silently
-  // drops any trailing positional argument. Keep the prompt out of argv
-  // (also keeps it off the process command line) — it is piped to the
-  // child's stdin in runJobFile().
+  // AGY 1.1.1 auto-enters non-interactive print mode for piped stdin when no
+  // --print flag is present. A bare --print would consume the next option as
+  // its required prompt value, so the prompt is written only to child stdin.
   return argv;
 }
 
@@ -297,13 +312,154 @@ export function analyzeAgyHelpResult(result) {
   };
 }
 
+function parseVersion(value) {
+  const match = String(value ?? "").match(/\b(\d+)\.(\d+)\.(\d+)\b/);
+  return match ? match.slice(1, 4).map(Number) : null;
+}
+
+function versionAtLeast(version, minimum) {
+  const actual = parseVersion(version);
+  const required = parseVersion(minimum);
+  if (!actual || !required) {
+    return false;
+  }
+  for (let index = 0; index < required.length; index += 1) {
+    if (actual[index] !== required[index]) {
+      return actual[index] > required[index];
+    }
+  }
+  return true;
+}
+
 export function agyAvailable(cwd = process.cwd(), env = process.env) {
-  const result = spawnSync("agy", ["--help"], {
+  const helpResult = spawnSync("agy", ["--help"], {
     cwd,
     env,
     encoding: "utf8"
   });
-  return analyzeAgyHelpResult(result);
+  const versionResult = spawnSync("agy", ["--version"], {
+    cwd,
+    env,
+    encoding: "utf8"
+  });
+  const versionOutput = `${versionResult.stdout ?? ""}${versionResult.stderr ?? ""}`;
+  const versionMatch = versionOutput.match(/\b\d+\.\d+\.\d+\b/);
+  const version = versionMatch?.[0] ?? null;
+  return {
+    ...analyzeAgyHelpResult(helpResult),
+    version,
+    minimumVersion: MIN_AGY_VERSION,
+    versionSupported: versionAtLeast(version, MIN_AGY_VERSION)
+  };
+}
+
+export async function runPrintSmoke(cwd = process.cwd(), env = process.env, options = {}) {
+  const startedAt = Date.now();
+  const timeout = String(options.timeout ?? "30s").trim();
+  const agy = options.agy ?? agyAvailable(cwd, env);
+  const unavailableReason = !agy.available || !agy.supports.print
+    ? "agy print mode is unavailable"
+    : agy.versionSupported === false
+      ? `agy ${agy.minimumVersion ?? MIN_AGY_VERSION} or newer is required`
+      : !agy.supports.sandbox
+        ? "agy sandbox mode is unavailable"
+        : null;
+  if (unavailableReason) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: unavailableReason,
+      timeout,
+      stdout: "",
+      stderr: "",
+      exitCode: null,
+      signal: null,
+      durationMs: 0
+    };
+  }
+
+  const argv = buildAgyArgv({
+    prompt: PRINT_SMOKE_PROMPT,
+    printTimeout: timeout,
+    sandbox: Boolean(agy.supports.sandbox)
+  }, agy.supports.printTimeout);
+  const hardTimeoutMs = goDurationToMilliseconds(timeout) + wrapperTimeoutGraceMs(env);
+
+  return new Promise((resolve) => {
+    const child = spawn("agy", argv, {
+      cwd,
+      env,
+      shell: false,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let settled = false;
+    let forceKillTimer = null;
+    const timeoutTimer = setTimeout(() => {
+      timedOut = true;
+      stderr += `agy smoke timed out after ${timeout}\n`;
+      child.kill("SIGTERM");
+      forceKillTimer = setTimeout(() => {
+        if (!settled) {
+          child.kill("SIGKILL");
+        }
+      }, FORCE_KILL_GRACE_MS);
+      forceKillTimer.unref();
+    }, hardTimeoutMs);
+    timeoutTimer.unref();
+
+    function finish(patch = {}) {
+      settled = true;
+      clearTimeout(timeoutTimer);
+      if (forceKillTimer) {
+        clearTimeout(forceKillTimer);
+      }
+      const durationMs = Date.now() - startedAt;
+      resolve({
+        ok: false,
+        skipped: false,
+        timeout,
+        stdout,
+        stderr,
+        exitCode: null,
+        signal: null,
+        timedOut,
+        durationMs,
+        ...patch
+      });
+    }
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on("error", (error) => {
+      stderr += `agy smoke failed to start: ${error.message}\n`;
+      finish({ error: error.message });
+    });
+
+    child.on("close", (exitCode, signal) => {
+      if (settled) {
+        return;
+      }
+      finish({
+        ok: !timedOut && exitCode === 0 && stdout.includes(PRINT_SMOKE_SENTINEL),
+        exitCode,
+        signal
+      });
+    });
+
+    if (child.stdin) {
+      child.stdin.end(PRINT_SMOKE_PROMPT, "utf8");
+    }
+  });
 }
 
 export async function runJobFile(jobFile, env = process.env) {
@@ -319,6 +475,30 @@ export async function runJobFile(jobFile, env = process.env) {
   }, env);
 
   const agy = agyAvailable(cwd, env);
+  const unavailableReason = !agy.available
+    ? "agy print mode is unavailable"
+    : !agy.versionSupported
+      ? `agy ${agy.minimumVersion} or newer is required`
+      : null;
+  if (unavailableReason) {
+    const endedAt = nowIso();
+    const message = `${unavailableReason}\n`;
+    fs.appendFileSync(payload.logFile, message, "utf8");
+    fs.writeFileSync(payload.resultFile, message, "utf8");
+    upsertJob(cwd, {
+      id: payload.id,
+      status: "failed",
+      error: unavailableReason,
+      endedAt
+    }, env);
+    return {
+      status: "failed",
+      stdout: "",
+      stderr: message,
+      exitCode: null,
+      signal: null
+    };
+  }
   const argv = buildAgyArgv(payload.runOptions, agy.supports.printTimeout);
   await fs.promises.appendFile(payload.logFile, `$ agy ${argv.map((arg) => JSON.stringify(arg)).join(" ")}\n`, "utf8");
 
@@ -341,7 +521,7 @@ export async function runJobFile(jobFile, env = process.env) {
     let timedOut = false;
     let settled = false;
     let forceKillTimer = null;
-    const timeoutMs = goDurationToMilliseconds(payload.runOptions.printTimeout);
+    const timeoutMs = goDurationToMilliseconds(payload.runOptions.printTimeout) + wrapperTimeoutGraceMs(env);
     const timeoutTimer = setTimeout(() => {
       timedOut = true;
       const message = `agy timed out after ${payload.runOptions.printTimeout}\n`;
@@ -419,7 +599,12 @@ export async function runJobFile(jobFile, env = process.env) {
       clearProcessTimers();
       const endedAt = nowIso();
       const resultText = [stdout, stderr].filter(Boolean).join(stdout && stderr ? "\n" : "");
-      const status = timedOut || stdinError ? "failed" : exitCode === 0 ? "succeeded" : "failed";
+      const hasCapturedStdout = stdout.trim().length > 0;
+      const status = timedOut && hasCapturedStdout
+        ? "partial"
+        : timedOut || stdinError
+          ? "failed"
+          : exitCode === 0 ? "succeeded" : "failed";
       fs.writeFileSync(payload.resultFile, resultText, "utf8");
       upsertJob(cwd, {
         id: payload.id,
