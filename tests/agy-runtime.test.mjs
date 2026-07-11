@@ -29,8 +29,10 @@ test("buildAgyArgv uses argv boundaries instead of shell interpolation", () => {
     sandbox: true
   });
 
+  // `--print` is a string flag that consumes the next token as the prompt, so it MUST be
+  // adjacent to and immediately followed by the prompt (and thus last). `--print-timeout`
+  // and all other flags come before it. See buildAgyArgv for the root-cause note.
   assert.deepEqual(argv, [
-    "--print",
     "--print-timeout",
     "10m0s",
     "--log-file",
@@ -38,8 +40,11 @@ test("buildAgyArgv uses argv boundaries instead of shell interpolation", () => {
     "--sandbox",
     "--add-dir",
     ROOT,
+    "--print",
     prompt
   ]);
+  assert.equal(argv[argv.length - 2], "--print");
+  assert.equal(argv[argv.length - 1], prompt);
 });
 
 test("dangerous permission bypass is explicit and never enabled by default", () => {

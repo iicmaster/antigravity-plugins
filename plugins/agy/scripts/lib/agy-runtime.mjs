@@ -99,7 +99,11 @@ export function goDurationToMilliseconds(duration) {
 
 export function buildAgyArgv(options = {}, supportsPrintTimeout = true) {
   const normalized = normalizeRunOptions(options);
-  const argv = ["--print"];
+  // NOTE: agy's `--print` is a STRING flag that consumes the NEXT token as the prompt.
+  // The old order `["--print", "--print-timeout", ...]` made `--print` swallow `--print-timeout`
+  // as the prompt (root cause of every agy review answering with a --print-timeout explanation).
+  // Fix: keep `--print <prompt>` adjacent and LAST; emit `--print-timeout` before it.
+  const argv = [];
   if (supportsPrintTimeout) {
     argv.push("--print-timeout", normalized.printTimeout);
   }
@@ -123,7 +127,7 @@ export function buildAgyArgv(options = {}, supportsPrintTimeout = true) {
     argv.push("--add-dir", dir);
   }
 
-  argv.push(normalized.prompt);
+  argv.push("--print", normalized.prompt);
   return argv;
 }
 
