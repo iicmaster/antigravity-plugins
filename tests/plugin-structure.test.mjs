@@ -71,6 +71,16 @@ test("Codex MCP config uses the local AGY stdio server", () => {
   assert.match(mcp.mcpServers.agy.args[1], /agy-mcp-server\.mjs/);
 });
 
+test("every version-bearing manifest matches the package version", () => {
+  const version = readJson("package.json").version;
+  const marketplace = readJson(".claude-plugin/marketplace.json");
+
+  assert.equal(readJson("plugins/agy/.claude-plugin/plugin.json").version, version);
+  assert.equal(readJson("plugins/agy/.codex-plugin/plugin.json").version, version);
+  assert.equal(marketplace.metadata.version, version);
+  assert.equal(marketplace.plugins.find((entry) => entry.name === "agy").version, version);
+});
+
 test("package metadata is ready for public open-source release", () => {
   const manifest = readJson("package.json");
 

@@ -607,7 +607,7 @@ export async function runJobFile(jobFile, env = process.env) {
       // empty; a run with real stdout is never a full denial. Line-anchored so
       // leading log noise on stderr cannot hide the banner.
       // ponytail: banner-text match; revisit if agy renames the jetski banner
-      const permissionDenied = !hasCapturedStdout && /^jetski: .*auto-denied/m.test(stderr);
+      const permissionDenied = !hasCapturedStdout && /^\s*jetski: .*auto-denied/m.test(stderr);
       const status = timedOut && hasCapturedStdout
         ? "partial"
         : timedOut || stdinError || permissionDenied
@@ -624,7 +624,7 @@ export async function runJobFile(jobFile, env = process.env) {
           : stdinError
             ? `agy stdin write failed: ${stdinError.message}`
             : permissionDenied
-              ? "agy auto-denied tool permissions in headless print mode; keep the sandbox enabled (default) or pass --dangerously-skip-permissions"
+              ? "agy auto-denied tool permissions in headless print mode; rerun without --no-sandbox or pass --dangerously-skip-permissions explicitly"
               : undefined,
         endedAt
       }, env);

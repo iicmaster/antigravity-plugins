@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.4 - 2026-07-17
+
+### Fixed
+
+- The Codex plugin manifest (`.codex-plugin/plugin.json`) now carries the real version; it had been stuck at 0.1.0, so Codex hosts kept a stale-named cache. A structure test now enforces version parity across every manifest.
+- The MCP `serverInfo` version is read from the plugin manifest instead of a hardcoded string.
+- The headless-denial error message no longer suggests enabling a sandbox that is already on; denial detection also tolerates indented banner lines.
+
 ## 0.1.3 - 2026-07-17
 
 ### Fixed

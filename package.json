@@ -1,6 +1,6 @@
 {
   "name": "@iicmaster/antigravity-plugins",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": false,
   "type": "module",
   "description": "Open-source Claude Code and Codex plugin adapters for delegating review and rescue workflows to the Antigravity CLI.",

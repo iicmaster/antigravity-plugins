@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -10,6 +11,9 @@ import { goDurationToMilliseconds } from "./lib/agy-runtime.mjs";
 
 const PLUGIN_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const COMPANION = path.join(PLUGIN_ROOT, "scripts", "agy-companion.mjs");
+const PLUGIN_VERSION = JSON.parse(
+  readFileSync(path.join(PLUGIN_ROOT, ".claude-plugin", "plugin.json"), "utf8")
+).version;
 const GO_DURATION_PATTERN = /^(?:\d+(?:\.\d+)?(?:ns|us|µs|ms|s|m|h))+$/;
 // spawnSync in runCompanion is synchronous: without a timeout a foreground
 // review/rescue blocks the MCP tool call until agy returns (up to the companion
@@ -302,7 +306,7 @@ async function handle(message) {
         sendResult(id, {
           protocolVersion: params?.protocolVersion ?? "2024-11-05",
           capabilities: { tools: {} },
-          serverInfo: { name: "agy", version: "0.1.0" }
+          serverInfo: { name: "agy", version: PLUGIN_VERSION }
         });
         break;
       case "ping":
