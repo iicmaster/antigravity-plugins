@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.2 - 2026-07-17
+
+### Fixed
+
+- Sandboxed headless runs now pass `--dangerously-skip-permissions` by default so review/rescue tool calls are no longer auto-denied in print mode (#5). Unsandboxed runs still require the explicit flag.
+- Jobs whose only output is the headless permission auto-denial banner are now reported as `failed` with an actionable error instead of `succeeded` with no usable result.
+- The setup print smoke check mirrors the real job invocation shape, including the sandboxed permission policy.
+
 ## 0.1.1 - 2026-07-17
 
 ### Fixed

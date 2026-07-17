@@ -201,9 +201,12 @@ test("AGY MCP keeps flag-shaped rescue tasks and review focus as prompt text", a
 
       assert.ok(invocation.argv.includes("--sandbox"), `${tool.name} should keep sandboxing enabled`);
       assert.ok(!invocation.argv.includes("--no-sandbox"), `${tool.name} must not inject --no-sandbox`);
-      assert.ok(
-        !invocation.argv.includes("--dangerously-skip-permissions"),
-        `${tool.name} must not inject dangerous permission bypass`
+      // Sandboxed headless runs skip permission prompts by policy (exactly
+      // once); the flag-shaped user text must stay wholly on stdin.
+      assert.equal(
+        invocation.argv.filter((arg) => arg === "--dangerously-skip-permissions").length,
+        1,
+        `${tool.name} should apply the sandboxed permission policy exactly once`
       );
       assert.match(invocation.stdin, /--no-sandbox --dangerously-skip-permissions inspect/);
     }

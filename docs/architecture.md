@@ -79,8 +79,8 @@ Outside Claude Code, the fallback is under `/tmp/agy-companion`.
 
 - `agy` is spawned with `shell: false`.
 - User prompt text is piped through child stdin without a `--print` argv value.
-- `--dangerously-skip-permissions` is only added when explicitly requested.
-- The default execution mode uses `--sandbox`.
+- The default execution mode uses `--sandbox`; the sandbox is the security boundary.
+- Sandboxed headless runs pass `--dangerously-skip-permissions` by default because print mode cannot answer permission prompts (tool calls would be auto-denied). Unsandboxed runs require the explicit flag.
 - State falls outside the repository by default unless Claude Code supplies plugin data storage.
 - Codex MCP tool arguments are schema-shaped and validated again inside the stdio server before reaching the companion runtime.
 

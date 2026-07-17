@@ -1,6 +1,6 @@
 {
   "name": "agy",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Claude Code plugin for delegating work to the Antigravity CLI (agy).",
   "author": {
     "name": "IIC Master"

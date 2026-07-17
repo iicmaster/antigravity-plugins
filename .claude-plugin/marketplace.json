@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Claude Code plugin that delegates review and rescue workflows to the Antigravity CLI.",
-    "version": "0.1.1"
+    "version": "0.1.2"
   },
   "plugins": [
     {
       "name": "agy",
       "description": "Use the Antigravity CLI from Claude Code for review, rescue, and background task handoff.",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "author": {
         "name": "IIC Master"
       },

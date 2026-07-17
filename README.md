@@ -164,8 +164,8 @@ The current developer-preview gate is:
 
 - `agy` is spawned with `shell: false` from runtime code.
 - User prompt text is piped through child stdin without passing `--print`; it is not placed in argv or shell-interpolated command text.
-- `--dangerously-skip-permissions` is never enabled unless explicitly requested.
-- The default AGY execution mode uses `--sandbox`.
+- The default AGY execution mode uses `--sandbox`; the sandbox is the security boundary.
+- Headless print mode cannot answer permission prompts, so sandboxed runs pass `--dangerously-skip-permissions` by default to keep tool calls from being auto-denied. Unsandboxed runs (`--no-sandbox`) never skip permissions unless explicitly requested.
 - Codex MCP arguments are validated before reaching the companion runtime, and the MCP rescue tool does not expose sandbox-disable or dangerous permission-bypass flags.
 - Job state is written outside the repository by default.
 

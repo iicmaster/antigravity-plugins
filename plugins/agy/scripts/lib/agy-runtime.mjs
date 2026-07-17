@@ -381,7 +381,10 @@ export async function runPrintSmoke(cwd = process.cwd(), env = process.env, opti
   const argv = buildAgyArgv({
     prompt: PRINT_SMOKE_PROMPT,
     printTimeout: timeout,
-    sandbox: Boolean(agy.supports.sandbox)
+    sandbox: Boolean(agy.supports.sandbox),
+    // Mirror the real job policy: sandboxed headless runs skip permission
+    // prompts, so the smoke check verifies the same invocation shape.
+    dangerouslySkipPermissions: Boolean(agy.supports.sandbox)
   }, agy.supports.printTimeout);
   const hardTimeoutMs = goDurationToMilliseconds(timeout) + wrapperTimeoutGraceMs(env);
 
@@ -600,9 +603,13 @@ export async function runJobFile(jobFile, env = process.env) {
       const endedAt = nowIso();
       const resultText = [stdout, stderr].filter(Boolean).join(stdout && stderr ? "\n" : "");
       const hasCapturedStdout = stdout.trim().length > 0;
+      // agy 1.1.x emits the headless-denial banner on stderr with empty stdout.
+      // ponytail: prefix match on the jetski banner; revisit if agy renames it
+      const bannerSource = hasCapturedStdout ? stdout.trim() : stderr.trim();
+      const permissionDenied = bannerSource.startsWith("jetski:") && bannerSource.includes("auto-denied");
       const status = timedOut && hasCapturedStdout
         ? "partial"
-        : timedOut || stdinError
+        : timedOut || stdinError || permissionDenied
           ? "failed"
           : exitCode === 0 ? "succeeded" : "failed";
       fs.writeFileSync(payload.resultFile, resultText, "utf8");
@@ -615,7 +622,9 @@ export async function runJobFile(jobFile, env = process.env) {
           ? `agy timed out after ${payload.runOptions.printTimeout}`
           : stdinError
             ? `agy stdin write failed: ${stdinError.message}`
-            : undefined,
+            : permissionDenied
+              ? "agy auto-denied tool permissions in headless print mode; keep the sandbox enabled (default) or pass --dangerously-skip-permissions"
+              : undefined,
         endedAt
       }, env);
       resolve({ status, stdout, stderr, exitCode, signal });

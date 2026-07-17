@@ -199,13 +199,17 @@ function buildReviewPrompt(kind, options, focusText) {
 async function runPromptJob(kind, prompt, options) {
   const cwd = process.cwd();
   const addDirs = options.addDir?.length ? options.addDir : [cwd];
+  const sandbox = !options["no-sandbox"];
   const payload = createJob(cwd, {
     kind,
     prompt,
     addDirs,
     printTimeout: options.timeout ?? "10m0s",
-    sandbox: !options["no-sandbox"],
-    dangerouslySkipPermissions: Boolean(options["dangerously-skip-permissions"]),
+    sandbox,
+    // Headless print mode cannot answer permission prompts, so agy auto-denies
+    // every tool call (#5). Inside the sandbox we skip the prompts instead;
+    // unsandboxed runs still require the explicit flag.
+    dangerouslySkipPermissions: Boolean(options["dangerously-skip-permissions"]) || sandbox,
     continueLast: Boolean(options.continue),
     conversation: options.conversation ?? null
   });

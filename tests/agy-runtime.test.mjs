@@ -462,6 +462,79 @@ if (!/stdin write failed/i.test(resultText)) {
   assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
 });
 
+test("runJobFile fails jobs whose only output is the headless permission auto-denial banner", async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-denied-"));
+  const binDir = path.join(cwd, "bin");
+  writeFakeAgy(
+    binDir,
+    `#!/usr/bin/env node
+if (process.argv.includes("--help")) {
+  console.log("--print --print-timeout --sandbox --add-dir --continue --conversation");
+  process.exit(0);
+}
+process.stdin.resume();
+process.stdin.on("end", () => {
+  // Real agy 1.1.x prints the denial banner on stderr and leaves stdout empty.
+  console.error('jetski: no output produced — a tool required the "command" permission that headless mode cannot prompt for, so it was auto-denied.');
+  process.exit(0);
+});
+`
+  );
+
+  const env = fakeAgyEnv(cwd, binDir);
+  const payload = createJob(cwd, {
+    kind: "rescue",
+    prompt: "run git log",
+    addDirs: [cwd],
+    printTimeout: "5s",
+    sandbox: true
+  }, env);
+
+  const result = await runJobFile(payload.jobFile, env);
+
+  assert.equal(result.status, "failed");
+});
+
+test("companion defaults permission skipping only for sandboxed headless runs", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-perm-default-"));
+  const binDir = path.join(cwd, "bin");
+  writeFakeAgy(
+    binDir,
+    `#!/usr/bin/env node
+if (process.argv.includes("--help")) {
+  console.log("--print --print-timeout --sandbox --add-dir --continue --conversation");
+  process.exit(0);
+}
+process.stdin.resume();
+process.stdin.on("end", () => {
+  console.log(JSON.stringify({ argv: process.argv.slice(2) }));
+});
+`
+  );
+
+  const env = fakeAgyEnv(cwd, binDir);
+  const runRescue = (extra) => {
+    const result = spawnSync(
+      process.execPath,
+      [COMPANION, "rescue", ...extra, "--timeout", "5s", "--", "inspect"],
+      { cwd, env, encoding: "utf8" }
+    );
+    assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+    return JSON.parse(result.stdout.match(/\{"argv":.*\}/)[0]).argv;
+  };
+
+  const sandboxed = runRescue([]);
+  assert.ok(sandboxed.includes("--sandbox"));
+  assert.equal(sandboxed.filter((arg) => arg === "--dangerously-skip-permissions").length, 1);
+
+  const unsandboxed = runRescue(["--no-sandbox"]);
+  assert.ok(!unsandboxed.includes("--sandbox"));
+  assert.ok(!unsandboxed.includes("--dangerously-skip-permissions"));
+
+  const explicit = runRescue(["--no-sandbox", "--dangerously-skip-permissions"]);
+  assert.ok(explicit.includes("--dangerously-skip-permissions"));
+});
+
 test("git review context includes bounded untracked file contents", () => {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-git-context-"));
   spawnSync("git", ["init"], { cwd, encoding: "utf8" });
