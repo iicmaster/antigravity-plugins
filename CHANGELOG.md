@@ -2,7 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## 0.1.1 - 2026-07-17
+
+### Fixed
+
+- Bump the plugin version so Claude Code invalidates the stale `0.1.0` cache; the cached build still sent a bare `--print` flag, which AGY 1.1.x parses as `--print <prompt>` — consuming `--print-timeout` as the prompt text, ignoring the real prompt on stdin (surfacing as EPIPE), and answering about the flag instead of the task.
 
 ### Added
 
