@@ -46,7 +46,9 @@ function createMcpClient(env) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-mcp-"));
   const child = spawn(process.execPath, [SERVER], {
     cwd,
-    env,
+    // Pin plugin state to the temp dir so tests never write into (or fail on)
+    // a real CLAUDE_PLUGIN_DATA inherited from the host session.
+    env: { ...env, CLAUDE_PLUGIN_DATA: path.join(cwd, "plugin-data") },
     stdio: ["pipe", "pipe", "pipe"],
     shell: false
   });

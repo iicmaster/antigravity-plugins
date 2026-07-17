@@ -603,10 +603,11 @@ export async function runJobFile(jobFile, env = process.env) {
       const endedAt = nowIso();
       const resultText = [stdout, stderr].filter(Boolean).join(stdout && stderr ? "\n" : "");
       const hasCapturedStdout = stdout.trim().length > 0;
-      // agy 1.1.x emits the headless-denial banner on stderr with empty stdout.
-      // ponytail: prefix match on the jetski banner; revisit if agy renames it
-      const bannerSource = hasCapturedStdout ? stdout.trim() : stderr.trim();
-      const permissionDenied = bannerSource.startsWith("jetski:") && bannerSource.includes("auto-denied");
+      // agy 1.1.x emits the headless-denial banner on stderr and leaves stdout
+      // empty; a run with real stdout is never a full denial. Line-anchored so
+      // leading log noise on stderr cannot hide the banner.
+      // ponytail: banner-text match; revisit if agy renames the jetski banner
+      const permissionDenied = !hasCapturedStdout && /^jetski: .*auto-denied/m.test(stderr);
       const status = timedOut && hasCapturedStdout
         ? "partial"
         : timedOut || stdinError || permissionDenied

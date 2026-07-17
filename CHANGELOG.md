@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.3 - 2026-07-17
+
+### Fixed
+
+- Headless-denial detection is line-anchored and scoped to empty-stdout runs, so leading log noise on stderr cannot hide the banner and real partial output is never misclassified as a denial.
+- MCP server tests pin `CLAUDE_PLUGIN_DATA` to a temp directory instead of writing job state into the host session's real plugin data dir.
+
 ## 0.1.2 - 2026-07-17
 
 ### Fixed

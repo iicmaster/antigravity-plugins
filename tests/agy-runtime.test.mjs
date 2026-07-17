@@ -474,7 +474,9 @@ if (process.argv.includes("--help")) {
 }
 process.stdin.resume();
 process.stdin.on("end", () => {
-  // Real agy 1.1.x prints the denial banner on stderr and leaves stdout empty.
+  // Real agy 1.1.x prints the denial banner on stderr and leaves stdout empty,
+  // sometimes after unrelated log lines.
+  console.error("I0717 13:01:55.729280 53857 server.go:1358] Starting language server");
   console.error('jetski: no output produced — a tool required the "command" permission that headless mode cannot prompt for, so it was auto-denied.');
   process.exit(0);
 });
