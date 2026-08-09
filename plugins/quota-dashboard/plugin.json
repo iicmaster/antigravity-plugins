@@ -1,0 +1,18 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "quota-dashboard",
+  "version": "0.1.4",
+  "description": "Real-time Quota & Usage Monitor Web Dashboard for Antigravity (AGY).",
+  "author": {
+    "name": "IIC Master"
+  },
+  "homepage": "https://github.com/iicmaster/antigravity-plugins#readme",
+  "repository": "https://github.com/iicmaster/antigravity-plugins",
+  "license": "MIT",
+  "keywords": [
+    "quota-dashboard",
+    "antigravity",
+    "agy",
+    "dashboard"
+  ]
+}

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity Quota Monitor - Real-Time Quota Tracker</title>
+  <meta name="description" content="Real-time Antigravity (AGY) quota and usage status dashboard.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="dashboard-header">
+      <div class="brand-badge">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="url(#paint0_linear)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 17L12 22L22 17" stroke="url(#paint1_linear)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 12L12 17L22 12" stroke="url(#paint2_linear)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="paint0_linear" x1="2" y1="2" x2="22" y2="12" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#4F46E5"/>
+                <stop offset="1" stop-color="#06B6D4"/>
+              </linearGradient>
+              <linearGradient id="paint1_linear" x1="2" y1="12" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#06B6D4"/>
+                <stop offset="1" stop-color="#10B981"/>
+              </linearGradient>
+              <linearGradient id="paint2_linear" x1="2" y1="7" x2="22" y2="17" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#8B5CF6"/>
+                <stop offset="1" stop-color="#EC4899"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Antigravity <span>Quota Monitor</span></h1>
+          <p class="subtitle">Real-time quota and usage status monitor on this machine</p>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div class="status-indicator" id="connectionStatus" role="status" aria-live="polite">
+          <span class="pulse-dot" aria-hidden="true"></span>
+          <span class="status-text">Connecting...</span>
+        </div>
+        <button id="refreshBtn" class="btn btn-primary" title="Refresh Quota Data" aria-label="Refresh Quota Data">
+          <svg class="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
+          <span>Refresh Data</span>
+        </button>
+        <label class="auto-refresh-toggle" title="Auto-refresh every 30 seconds">
+          <input type="checkbox" id="autoRefreshToggle" role="switch" aria-label="Toggle auto-refresh every 30 seconds" checked>
+          <span class="toggle-slider"></span>
+          <span class="toggle-label">Auto-Refresh (30s)</span>
+        </label>
+      </div>
+    </header>
+
+    <!-- Info Banner / Account Overview -->
+    <section class="overview-banner">
+      <div class="info-card">
+        <div class="info-card-header">
+          <div class="info-icon model-icon" aria-hidden="true">🤖</div>
+        </div>
+        <div class="info-content">
+          <span class="info-label">ACTIVE MODEL</span>
+          <strong class="info-value" id="activeModel" title="Active Model">...</strong>
+        </div>
+      </div>
+
+      <div class="info-card info-card-upgrade">
+        <div class="info-card-header">
+          <div class="info-icon credit-icon" aria-hidden="true">⚡</div>
+          <a id="upgradeLink" href="https://antigravity.google/g1-upgrade" target="_blank" class="upgrade-btn" aria-label="Upgrade Antigravity Plan">
+            <span>Upgrade</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+          </a>
+        </div>
+        <div class="info-content">
+          <span class="info-label">AI PREMIUM CREDITS</span>
+          <strong class="info-value" id="remainingCredits">...</strong>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card-header">
+          <div class="info-icon auth-icon" aria-hidden="true">🔐</div>
+        </div>
+        <div class="info-content">
+          <span class="info-label">AUTHENTICATION</span>
+          <strong class="info-value" id="authMethod">...</strong>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card-header">
+          <div class="info-icon clock-icon" aria-hidden="true">⏳</div>
+        </div>
+        <div class="info-content">
+          <span class="info-label">LAST UPDATED</span>
+          <strong class="info-value" id="lastUpdated">...</strong>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Quota Grid -->
+    <main class="dashboard-grid">
+      <!-- Gemini Models Section -->
+      <section class="quota-group-card" id="geminiGroup">
+        <div class="group-header">
+          <div class="group-title">
+            <span class="group-logo gemini-logo">✨</span>
+            <h2>Gemini Models</h2>
+          </div>
+          <span class="group-badge">GOOGLE AI</span>
+        </div>
+
+        <div class="meters-container">
+          <!-- Gemini Weekly -->
+          <div class="meter-card" id="meter-gemini-weekly">
+            <div class="meter-header">
+              <div class="meter-title">
+                <h3>Weekly Limit</h3>
+                <span class="meter-subtitle">Weekly Quota Remaining</span>
+              </div>
+              <div class="meter-percent" id="geminiWeeklyPercent">...</div>
+            </div>
+
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="geminiWeeklyFill" style="width: 0%"></div>
+            </div>
+
+            <div class="meter-footer">
+              <span class="status-badge" id="geminiWeeklyBadge">Loading...</span>
+              <div class="reset-time-box">
+                <span class="reset-icon">⏰</span>
+                <span class="reset-label">Reset In:</span>
+                <span class="reset-timer" id="geminiWeeklyTimer">...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gemini 5-Hour -->
+          <div class="meter-card" id="meter-gemini-5h">
+            <div class="meter-header">
+              <div class="meter-title">
+                <h3>5-Hour Limit</h3>
+                <span class="meter-subtitle">5-Hour Window Quota</span>
+              </div>
+              <div class="meter-percent" id="gemini5hPercent">...</div>
+            </div>
+
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="gemini5hFill" style="width: 0%"></div>
+            </div>
+
+            <div class="meter-footer">
+              <span class="status-badge" id="gemini5hBadge">Loading...</span>
+              <div class="reset-time-box">
+                <span class="reset-icon">⏰</span>
+                <span class="reset-label">Reset In:</span>
+                <span class="reset-timer" id="gemini5hTimer">...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Claude and GPT models Section -->
+      <section class="quota-group-card" id="claudeGptGroup">
+        <div class="group-header">
+          <div class="group-title">
+            <span class="group-logo claude-logo">🧠</span>
+            <h2>Claude & GPT Models</h2>
+          </div>
+          <span class="group-badge">ANTHROPIC / OPENAI</span>
+        </div>
+
+        <div class="meters-container">
+          <!-- Claude/GPT Weekly -->
+          <div class="meter-card" id="meter-claude-weekly">
+            <div class="meter-header">
+              <div class="meter-title">
+                <h3>Weekly Limit</h3>
+                <span class="meter-subtitle">Weekly Quota Remaining</span>
+              </div>
+              <div class="meter-percent" id="claudeWeeklyPercent">...</div>
+            </div>
+
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="claudeWeeklyFill" style="width: 0%"></div>
+            </div>
+
+            <div class="meter-footer">
+              <span class="status-badge" id="claudeWeeklyBadge">Loading...</span>
+              <div class="reset-time-box">
+                <span class="reset-icon">⏰</span>
+                <span class="reset-label">Reset In:</span>
+                <span class="reset-timer" id="claudeWeeklyTimer">...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Claude/GPT 5-Hour -->
+          <div class="meter-card" id="meter-claude-5h">
+            <div class="meter-header">
+              <div class="meter-title">
+                <h3>5-Hour Limit</h3>
+                <span class="meter-subtitle">5-Hour Window Quota</span>
+              </div>
+              <div class="meter-percent" id="claude5hPercent">...</div>
+            </div>
+
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="claude5hFill" style="width: 0%"></div>
+            </div>
+
+            <div class="meter-footer">
+              <span class="status-badge" id="claude5hBadge">Loading...</span>
+              <div class="reset-time-box">
+                <span class="reset-icon">⏰</span>
+                <span class="reset-label">Reset In:</span>
+                <span class="reset-timer" id="claude5hTimer">...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Raw Data Drawer Toggle & Portal Links -->
+    <footer class="dashboard-footer">
+      <div class="footer-links">
+        <a href="https://antigravity.google" target="_blank" class="footer-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/>
+          </svg>
+          Antigravity Official Portal ↗
+        </a>
+        <button id="toggleJsonBtn" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 18 22 12 16 6"/>
+            <polyline points="8 6 2 12 8 18"/>
+          </svg>
+          Show RAW JSON
+        </button>
+      </div>
+
+      <div class="json-drawer hidden" id="jsonDrawer">
+        <div class="json-header">
+          <span>Raw API Response (`agy -p "/usage"`)</span>
+          <button id="copyJsonBtn" class="btn btn-sm">Copy JSON</button>
+        </div>
+        <pre><code id="jsonCode">// Loading payload...</code></pre>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

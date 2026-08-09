@@ -77,8 +77,13 @@ test("every version-bearing manifest matches the package version", () => {
 
   assert.equal(readJson("plugins/agy/.claude-plugin/plugin.json").version, version);
   assert.equal(readJson("plugins/agy/.codex-plugin/plugin.json").version, version);
+  assert.equal(readJson("plugins/agy/plugin.json").version, version);
+  assert.equal(readJson("plugins/quota-dashboard/.claude-plugin/plugin.json").version, version);
+  assert.equal(readJson("plugins/quota-dashboard/.codex-plugin/plugin.json").version, version);
+  assert.equal(readJson("plugins/quota-dashboard/plugin.json").version, version);
   assert.equal(marketplace.metadata.version, version);
   assert.equal(marketplace.plugins.find((entry) => entry.name === "agy").version, version);
+  assert.equal(marketplace.plugins.find((entry) => entry.name === "quota-dashboard").version, version);
 });
 
 test("package metadata is ready for public open-source release", () => {
@@ -163,9 +168,25 @@ test("Claude commands route through the shared agy companion script", () => {
   }
 });
 
-test("future agy-native plugin work is documented outside the current plugin", () => {
+test("future agy-native plugin work is documented and root plugin.json complies with agent-plugins.org", () => {
   assert.ok(fs.existsSync(path.join(ROOT, "docs", "future-projects", "agy-native-plugin.md")));
-  assert.ok(!fs.existsSync(path.join(PLUGIN_ROOT, "plugin.json")));
+  const agyPlugin = readJson("plugins/agy/plugin.json");
+  assert.equal(agyPlugin.$schema, "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json");
+  assert.equal(agyPlugin.name, "agy");
+
+  const quotaPlugin = readJson("plugins/quota-dashboard/plugin.json");
+  assert.equal(quotaPlugin.$schema, "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json");
+  assert.equal(quotaPlugin.name, "quota-dashboard");
+
+  const agyMcp = readJson("plugins/agy/mcp.json");
+  assert.equal(agyMcp.$schema, "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json");
+  assert.ok(agyMcp.mcpServers.agy);
+  assert.equal(agyMcp.mcpServers.agy.type, "stdio");
+
+  const quotaMcp = readJson("plugins/quota-dashboard/mcp.json");
+  assert.equal(quotaMcp.$schema, "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json");
+  assert.ok(quotaMcp.mcpServers["quota-dashboard"]);
+  assert.equal(quotaMcp.mcpServers["quota-dashboard"].type, "stdio");
 });
 
 test("rescue prompt defaults to no file edits unless explicitly requested", () => {
@@ -181,4 +202,20 @@ test("Codex-facing skill routes through the local wrapper instead of Claude-only
   assert.doesNotMatch(codexSkill, /CLAUDE_PLUGIN_ROOT/);
   assert.match(wrapper, /agy-companion\.mjs/);
   assert.match(wrapper, /shell:\s*false/);
+});
+
+test("agent-plugins.org specification and README compliance docs are present", () => {
+  const spec = readText("docs/AGENT_PLUGINS_SPEC.md");
+  const readme = readText("README.md");
+
+  assert.match(spec, /Agent Plugins Specification \(v1\.0\.0\)/i);
+  assert.match(spec, /agent-plugins\.org/i);
+  assert.match(spec, /Portable Package Structure/i);
+  assert.match(spec, /Reverse-Domain Client Extensions/i);
+  assert.match(spec, /Guide for Plugin Authors/i);
+  assert.match(spec, /Guide for Client Implementers/i);
+
+  assert.match(readme, /Agent Plugins Standard \(agent-plugins\.org\)/i);
+  assert.match(readme, /Creating and Validating Plugins/i);
+  assert.match(readme, /docs\/AGENT_PLUGINS_SPEC\.md/i);
 });

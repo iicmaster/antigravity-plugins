@@ -1,0 +1,20 @@
+---
+name: quota-dashboard
+description: Antigravity Quota Monitor Dashboard - Real-time web UI and status inspector for AGY model quota and credits.
+---
+
+# Quota Dashboard Skill
+
+Use this skill when you need to inspect or display real-time Antigravity (AGY) quota usage, remaining credits, model reset timers, or run the local Quota Dashboard web app.
+
+## Web Dashboard Server
+- Location: `plugins/quota-dashboard/`
+- Start server: `node plugins/quota-dashboard/server.js` or `./plugins/quota-dashboard/start.sh`
+- Access URL: `http://localhost:3838`
+
+## API Endpoints
+- `GET http://localhost:3838/api/quota`: Returns JSON payload containing:
+  - `activeModel`: Active model name
+  - `quotas`: Usage percentages and reset timestamps for Gemini & Claude/GPT models
+  - `credits`: Remaining credits and upgrade URL
+  - `token`: Authentication method and token expiration

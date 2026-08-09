@@ -14,7 +14,8 @@ It is not a general-availability hosted product. Users still need local `agy` au
 
 - Claude Code plugin marketplace metadata in `.claude-plugin/`.
 - Codex plugin marketplace metadata in `.agents/plugins/`.
-- One plugin, `plugins/agy`, with Claude slash commands and a Codex MCP server.
+- `plugins/agy`: Claude slash commands and Codex MCP server for delegating review/rescue tasks to `agy`.
+- `plugins/quota-dashboard`: Real-time Web UI Dashboard (`http://localhost:3838`) for monitoring `agy` quota and credits.
 - Shared Node.js runtime scripts for launching, tracking, reading, and cancelling AGY jobs.
 - A focused Node test suite for runtime safety, plugin structure, and MCP behavior.
 
@@ -27,6 +28,38 @@ The current design is one AGY domain plugin with host-specific adapters around a
 - Both hosts call the same companion/runtime scripts for command parsing, job state, cancellation, and implicit non-interactive AGY execution.
 
 Keep Claude/Codex adapters thin. Do not split the runtime into separate Claude and Codex copies unless the host contracts diverge enough that sharing creates more risk than duplication.
+
+## Agent Plugins Standard (agent-plugins.org)
+
+This repository is compliant with the **Agent Plugins v1.0.0** open standard ([agent-plugins.org](https://agent-plugins.org)).
+
+Plugins in this repository use a portable, cross-client package structure that separates core agent skills (`skills/`) and Model Context Protocol configurations (`.mcp.json`) from client-specific extensions. Host-specific features use reverse-domain directory namespaces (`.claude-plugin/`, `.codex-plugin/`) so client-native enhancements do not break interoperability across agent runtimes.
+
+For complete specification details, manifest JSON schemas, and implementer guides, see [docs/AGENT_PLUGINS_SPEC.md](docs/AGENT_PLUGINS_SPEC.md).
+
+### Creating and Validating Plugins
+
+To add a new plugin to this repository:
+
+1. **Create the Plugin Directory**:
+   Create `plugins/<plugin-name>` containing:
+   - Portable `skills/` directory with `SKILL.md` skill definitions.
+   - Standard `plugin.json` manifest (or host-specific manifests under `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`).
+   - Optional Model Context Protocol server configuration in `.mcp.json`.
+
+2. **Register in Marketplace Manifests**:
+   Add the plugin entry to both host marketplace indices:
+   - Claude Code: `.claude-plugin/marketplace.json`
+   - Codex: `.agents/plugins/marketplace.json`
+
+3. **Validate the Plugin**:
+   Run the repository test suite to verify structural integrity, schema compliance, SemVer matching across manifests, and runtime safety:
+   ```bash
+   npm test
+   # or
+   npm run validate
+   ```
+
 
 ## Requirements
 

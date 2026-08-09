@@ -670,3 +670,139 @@ export function cancelJob(cwd, job, env = process.env) {
   upsertJob(cwd, { id: job.id, status: "cancelled", endedAt: nowIso() }, env);
   return true;
 }
+
+export function validateAgentPluginManifest(manifest) {
+  if (!manifest || typeof manifest !== "object") {
+    return { valid: false, error: "Manifest must be an object" };
+  }
+  if (typeof manifest.$schema !== "string" || !manifest.$schema.startsWith("https://agent-plugins.org/schemas/")) {
+    return { valid: false, error: "Manifest $schema must start with https://agent-plugins.org/schemas/" };
+  }
+  if (typeof manifest.name !== "string" || !/^(?!.*(?:--|\.\.))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(manifest.name)) {
+    return { valid: false, error: "Manifest name is missing or invalid" };
+  }
+  return { valid: true };
+}
+
+export function validateAgentPluginMcp(mcp) {
+  if (!mcp || typeof mcp !== "object") {
+    return { valid: false, error: "MCP config must be an object" };
+  }
+  if (typeof mcp.$schema !== "string" || !mcp.$schema.startsWith("https://agent-plugins.org/schemas/")) {
+    return { valid: false, error: "MCP $schema must start with https://agent-plugins.org/schemas/" };
+  }
+  if (!mcp.mcpServers || typeof mcp.mcpServers !== "object") {
+    return { valid: false, error: "MCP mcpServers must be an object" };
+  }
+  return { valid: true };
+}
+
+export function isAgentPlugin(pluginDir) {
+  const manifestPath = path.join(pluginDir, "plugin.json");
+  if (!fs.existsSync(manifestPath)) {
+    return false;
+  }
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    return validateAgentPluginManifest(manifest).valid;
+  } catch {
+    return false;
+  }
+}
+
+export function readAgentPlugin(pluginDir) {
+  const manifestPath = path.join(pluginDir, "plugin.json");
+  if (!fs.existsSync(manifestPath)) {
+    return null;
+  }
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const validation = validateAgentPluginManifest(manifest);
+    if (!validation.valid) {
+      return null;
+    }
+
+    const mcpPath = path.join(pluginDir, "mcp.json");
+    let mcp = null;
+    if (fs.existsSync(mcpPath)) {
+      try {
+        const parsedMcp = JSON.parse(fs.readFileSync(mcpPath, "utf8"));
+        if (validateAgentPluginMcp(parsedMcp).valid) {
+          mcp = parsedMcp;
+        }
+      } catch {}
+    }
+
+    const skillsDir = path.join(pluginDir, "skills");
+    const skills = [];
+    if (fs.existsSync(skillsDir) && fs.statSync(skillsDir).isDirectory()) {
+      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const skillFile = path.join(skillsDir, entry.name, "SKILL.md");
+          if (fs.existsSync(skillFile)) {
+            skills.push({
+              name: entry.name,
+              path: path.join(skillsDir, entry.name),
+              skillFile
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      name: manifest.name,
+      version: manifest.version ?? null,
+      description: manifest.description ?? null,
+      path: path.resolve(pluginDir),
+      manifest,
+      mcp,
+      skills
+    };
+  } catch {
+    return null;
+  }
+}
+
+export const loadAgentPlugin = readAgentPlugin;
+export const loadPlugin = readAgentPlugin;
+
+export function discoverAgentPlugins(baseDir = process.cwd(), options = {}) {
+  const plugins = [];
+  const visited = new Set();
+
+  function tryAdd(dir) {
+    const absPath = path.resolve(dir);
+    if (visited.has(absPath)) return;
+    visited.add(absPath);
+
+    if (fs.existsSync(absPath) && fs.statSync(absPath).isDirectory()) {
+      const plugin = readAgentPlugin(absPath);
+      if (plugin) {
+        plugins.push(plugin);
+      }
+    }
+  }
+
+  // 1. Check baseDir directly
+  tryAdd(baseDir);
+
+  // 2. Check search subdirectories
+  const subdirs = options.searchPaths ?? ["plugins", ".agents/plugins"];
+  for (const sub of subdirs) {
+    const targetDir = path.join(baseDir, sub);
+    if (fs.existsSync(targetDir) && fs.statSync(targetDir).isDirectory()) {
+      const entries = fs.readdirSync(targetDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          tryAdd(path.join(targetDir, entry.name));
+        }
+      }
+    }
+  }
+
+  return plugins;
+}
+
+export const discoverPlugins = discoverAgentPlugins;

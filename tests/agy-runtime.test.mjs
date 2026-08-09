@@ -10,10 +10,15 @@ import {
   analyzeAgyHelpResult,
   buildAgyArgv,
   createJob,
+  discoverAgentPlugins,
   goDurationToMilliseconds,
+  isAgentPlugin,
   normalizeRunOptions,
+  readAgentPlugin,
   runJobFile,
-  resolveStateDir
+  resolveStateDir,
+  validateAgentPluginManifest,
+  validateAgentPluginMcp
 } from "../plugins/agy/scripts/lib/agy-runtime.mjs";
 import { collectGitReviewContext } from "../plugins/agy/scripts/lib/git-context.mjs";
 
@@ -539,7 +544,12 @@ process.stdin.on("end", () => {
 
 test("git review context includes bounded untracked file contents", () => {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-git-context-"));
-  spawnSync("git", ["init"], { cwd, encoding: "utf8" });
+  const env = { ...process.env };
+  delete env.GIT_DIR;
+  delete env.GIT_WORK_TREE;
+  delete env.GIT_INDEX_FILE;
+  delete env.GIT_PREFIX;
+  spawnSync("git", ["init"], { cwd, env, encoding: "utf8" });
   fs.writeFileSync(path.join(cwd, "new-feature.js"), "export const value = 42;\n", "utf8");
 
   const context = collectGitReviewContext(cwd);
@@ -547,4 +557,49 @@ test("git review context includes bounded untracked file contents", () => {
   assert.match(context.content, /## untracked file contents/);
   assert.match(context.content, /### new-feature\.js/);
   assert.match(context.content, /export const value = 42;/);
+});
+
+test("validateAgentPluginManifest checks schema and plugin name format", () => {
+  assert.equal(validateAgentPluginManifest(null).valid, false);
+  assert.equal(validateAgentPluginManifest({}).valid, false);
+  assert.equal(validateAgentPluginManifest({ $schema: "invalid", name: "agy" }).valid, false);
+  assert.equal(validateAgentPluginManifest({ $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", name: "BAD NAME!" }).valid, false);
+  assert.equal(validateAgentPluginManifest({ $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", name: "agy" }).valid, true);
+});
+
+test("validateAgentPluginMcp checks schema and mcpServers property", () => {
+  assert.equal(validateAgentPluginMcp(null).valid, false);
+  assert.equal(validateAgentPluginMcp({}).valid, false);
+  assert.equal(validateAgentPluginMcp({ $schema: "invalid", mcpServers: {} }).valid, false);
+  assert.equal(validateAgentPluginMcp({ $schema: "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json", mcpServers: {} }).valid, true);
+});
+
+test("readAgentPlugin reads plugin.json, mcp.json, and skills from a compliant directory", () => {
+  const agyPlugin = readAgentPlugin(path.join(ROOT, "plugins", "agy"));
+  assert.ok(agyPlugin);
+  assert.equal(agyPlugin.name, "agy");
+  assert.equal(agyPlugin.manifest.$schema, "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json");
+  assert.ok(agyPlugin.mcp);
+  assert.equal(agyPlugin.mcp.$schema, "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json");
+  assert.ok(Array.isArray(agyPlugin.skills));
+
+  const quotaPlugin = readAgentPlugin(path.join(ROOT, "plugins", "quota-dashboard"));
+  assert.ok(quotaPlugin);
+  assert.equal(quotaPlugin.name, "quota-dashboard");
+  assert.equal(quotaPlugin.manifest.$schema, "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json");
+  assert.ok(quotaPlugin.mcp);
+  assert.equal(quotaPlugin.mcp.$schema, "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json");
+});
+
+test("discoverAgentPlugins discovers all compliant plugins in workspace", () => {
+  const plugins = discoverAgentPlugins(ROOT);
+  const names = plugins.map((p) => p.name);
+  assert.ok(names.includes("agy"), "Should discover agy plugin");
+  assert.ok(names.includes("quota-dashboard"), "Should discover quota-dashboard plugin");
+});
+
+test("isAgentPlugin correctly identifies compliant plugin directories", () => {
+  assert.equal(isAgentPlugin(path.join(ROOT, "plugins", "agy")), true);
+  assert.equal(isAgentPlugin(path.join(ROOT, "plugins", "quota-dashboard")), true);
+  assert.equal(isAgentPlugin(ROOT), false);
 });

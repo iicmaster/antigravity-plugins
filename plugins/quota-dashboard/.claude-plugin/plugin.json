@@ -1,0 +1,5 @@
+{
+  "name": "quota-dashboard",
+  "version": "0.1.4",
+  "description": "Real-time Quota & Usage Monitor Web Dashboard for Antigravity (AGY)."
+}

@@ -1,0 +1,7 @@
+{
+  "name": "sample-agent-plugin",
+  "version": "1.0.0",
+  "description": "Canonical reference Agent Plugin specification v1.0.0 demonstration package.",
+  "skills": "./skills/",
+  "mcpServers": "./mcp.json"
+}

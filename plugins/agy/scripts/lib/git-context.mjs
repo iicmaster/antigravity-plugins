@@ -7,8 +7,14 @@ const MAX_UNTRACKED_BYTES_PER_FILE = 20_000;
 const MAX_UNTRACKED_TOTAL_BYTES = 100_000;
 
 function runGit(cwd, args) {
+  const env = { ...process.env };
+  delete env.GIT_DIR;
+  delete env.GIT_WORK_TREE;
+  delete env.GIT_INDEX_FILE;
+  delete env.GIT_PREFIX;
   const result = spawnSync("git", args, {
     cwd,
+    env,
     encoding: "utf8"
   });
   return {

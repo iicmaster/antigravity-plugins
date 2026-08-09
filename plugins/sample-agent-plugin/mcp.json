@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "sample-stdio-server": {
+      "command": "node",
+      "args": [
+        "./scripts/server.mjs"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    "sample-http-server": {
+      "type": "streamable-http",
+      "url": "https://api.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer sample-token"
+      }
+    },
+    "sample-sse-server": {
+      "type": "sse",
+      "url": "https://sse.example.com/events"
+    }
+  }
+}
