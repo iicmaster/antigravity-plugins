@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.2.0 - 2026-08-17
+
+### Added
+
+- **Quota Dashboard Plugin**: Real-time Quota & Usage Monitor Web Dashboard for Antigravity (`agy`) featuring live quota gauges, reset countdown timers, AI Premium Credits status, active model inspection, and RAW JSON debugging viewer.
+- **MCP Stdio Tools**:
+  - `get_quota`: Fetch live model quota percentages, countdowns, remaining credits, and active model status.
+  - `open_dashboard`: Check server health on port 3838, automatically spawn background daemon if stopped, and launch cross-platform default browser.
+- **Agent Plugins Spec Compliance**: Implemented `agent-plugins.org` v1.0.0 portable package specification with `plugin.json` and `mcp.json` schemas for multi-host interoperability (Claude Code and Codex).
+- **Minimal MUJI UI**: Clean, responsive, and minimalist typography/theme for the Quota Dashboard frontend.
+- **Automated Tests**: Test suite coverage expanded to 57 passing tests including MCP tools validation and plugin discovery.
+
 ## 0.1.4 - 2026-07-17
 
 ### Fixed

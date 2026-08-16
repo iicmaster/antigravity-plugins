@@ -52,7 +52,7 @@ The standard manifest `plugin.json` declares the baseline plugin metadata, versi
 ```json
 {
   "name": "agy",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Delegate review and rescue workflows to the Antigravity CLI (agy).",
   "author": {
     "name": "IIC Master"

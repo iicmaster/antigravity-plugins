@@ -5,7 +5,11 @@ description: Antigravity Quota Monitor Dashboard - Real-time web UI and status i
 
 # Quota Dashboard Skill
 
-Use this skill when you need to inspect or display real-time Antigravity (AGY) quota usage, remaining credits, model reset timers, or run the local Quota Dashboard web app.
+Use this skill when you need to inspect or display real-time Antigravity (AGY) quota usage, remaining credits, model reset timers, or run/launch the local Quota Dashboard web app.
+
+## MCP Tools
+- `get_quota`: Fetch structured real-time quota, credits, and model info.
+- `open_dashboard`: Check if server is running on port 3838 (or custom port), auto-start if down, and launch browser.
 
 ## Web Dashboard Server
 - Location: `plugins/quota-dashboard/`

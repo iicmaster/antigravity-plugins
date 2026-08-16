@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 
-import { exec } from 'node:child_process';
+import { exec, spawn } from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
+import net from 'node:net';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function runCommand(cmd) {
   return new Promise((resolve) => {
@@ -89,6 +94,79 @@ function getTokenInfo() {
   return {};
 }
 
+function isPortInUse(port, host = '127.0.0.1') {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(400);
+
+    socket.once('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+
+    socket.once('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+
+    socket.once('error', () => {
+      resolve(false);
+    });
+
+    socket.connect(port, host);
+  });
+}
+
+async function startDashboardServer(port = 3838) {
+  const serverPath = path.join(__dirname, 'server.js');
+  const child = spawn(process.execPath, [serverPath], {
+    detached: true,
+    stdio: 'ignore',
+    env: { ...process.env, PORT: String(port) }
+  });
+  child.unref();
+
+  // Poll until server port is ready (up to 3 seconds)
+  const startTime = Date.now();
+  while (Date.now() - startTime < 3000) {
+    await new Promise((r) => setTimeout(r, 200));
+    const inUse = await isPortInUse(port);
+    if (inUse) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function launchBrowser(url) {
+  return new Promise((resolve) => {
+    let cmd = '';
+    let args = [];
+
+    if (process.platform === 'darwin') {
+      cmd = 'open';
+      args = [url];
+    } else if (process.platform === 'win32') {
+      cmd = 'cmd';
+      args = ['/c', 'start', '""', url];
+    } else {
+      cmd = 'xdg-open';
+      args = [url];
+    }
+
+    try {
+      const proc = spawn(cmd, args, { detached: true, stdio: 'ignore' });
+      proc.on('error', (err) => {
+        resolve({ opened: false, error: err.message });
+      });
+      proc.unref();
+      resolve({ opened: true });
+    } catch (err) {
+      resolve({ opened: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}
+
 const tools = [
   {
     name: "get_quota",
@@ -97,6 +175,24 @@ const tools = [
       type: "object",
       additionalProperties: false,
       properties: {}
+    }
+  },
+  {
+    name: "open_dashboard",
+    description: "Ensure the Quota Dashboard server is running and optionally open it in the default browser.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        port: {
+          type: "number",
+          description: "Port number for the dashboard web server (default: 3838)."
+        },
+        openBrowser: {
+          type: "boolean",
+          description: "Whether to open the dashboard URL in the default web browser (default: true)."
+        }
+      }
     }
   }
 ];
@@ -113,35 +209,86 @@ function sendError(id, code, message) {
   send({ jsonrpc: "2.0", id, error: { code, message } });
 }
 
-async function handleTool(name) {
-  if (name !== 'get_quota') {
-    throw new Error(`Unknown tool: ${name}`);
+async function handleTool(name, args = {}) {
+  if (name === 'get_quota') {
+    const [usageRes, creditsRes] = await Promise.all([
+      runCommand('agy -p "/usage"'),
+      runCommand('agy -p "/credits"')
+    ]);
+
+    const quotas = parseUsageOutput(usageRes.stdout);
+    const credits = parseCreditsOutput(creditsRes.stdout);
+    const settings = getLocalSettings();
+    const token = getTokenInfo();
+
+    const payload = {
+      success: true,
+      timestamp: new Date().toISOString(),
+      activeModel: settings.model || 'Gemini 3.6 Flash (High)',
+      runningSpeed: settings.runningLightSpeed || 'fast',
+      quotas,
+      credits,
+      token
+    };
+
+    return {
+      content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+      isError: false
+    };
   }
 
-  const [usageRes, creditsRes] = await Promise.all([
-    runCommand('agy -p "/usage"'),
-    runCommand('agy -p "/credits"')
-  ]);
+  if (name === 'open_dashboard') {
+    const rawPort = args?.port != null ? parseInt(args.port, 10) : 3838;
+    const port = isNaN(rawPort) || rawPort < 1024 || rawPort > 65535 ? 3838 : rawPort;
+    const openBrowser = args?.openBrowser !== false;
+    const url = `http://localhost:${port}`;
 
-  const quotas = parseUsageOutput(usageRes.stdout);
-  const credits = parseCreditsOutput(creditsRes.stdout);
-  const settings = getLocalSettings();
-  const token = getTokenInfo();
+    let status = 'already_running';
+    let running = await isPortInUse(port);
 
-  const payload = {
-    success: true,
-    timestamp: new Date().toISOString(),
-    activeModel: settings.model || 'Gemini 3.6 Flash (High)',
-    runningSpeed: settings.runningLightSpeed || 'fast',
-    quotas,
-    credits,
-    token
-  };
+    if (!running) {
+      const started = await startDashboardServer(port);
+      if (started) {
+        status = 'started';
+        running = true;
+      } else {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              success: false,
+              error: `Failed to start Quota Dashboard server on port ${port}`,
+              url,
+              port
+            }, null, 2)
+          }],
+          isError: true
+        };
+      }
+    }
 
-  return {
-    content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-    isError: false
-  };
+    let browserResult = { opened: false };
+    if (openBrowser) {
+      browserResult = await launchBrowser(url);
+    }
+
+    const payload = {
+      success: true,
+      status,
+      port,
+      url,
+      browserOpened: browserResult.opened,
+      ...(browserResult.error ? { browserError: browserResult.error } : {}),
+      message: `Quota Dashboard is active at ${url}`
+    };
+
+    return {
+      content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+      isError: false
+    };
+  }
+
+  throw new Error(`Unknown tool: ${name}`);
 }
 
 async function handle(message) {
@@ -164,7 +311,7 @@ async function handle(message) {
         sendResult(id, { tools });
         break;
       case "tools/call":
-        const result = await handleTool(params?.name);
+        const result = await handleTool(params?.name, params?.arguments);
         sendResult(id, result);
         break;
       default:

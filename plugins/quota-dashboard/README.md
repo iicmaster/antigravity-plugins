@@ -8,10 +8,16 @@ Real-time Quota & Usage Monitor Web Dashboard for Antigravity (`agy`).
 - **AI Premium Credits**: View remaining credits and upgrade link.
 - **Account & Token Status**: Check active model and authentication method.
 - **RAW JSON Inspection**: One-click JSON view and copy functionality for debugging `agy` outputs.
+- **MCP Integration**: Stdio MCP tools to fetch live quota and automatically launch the dashboard browser UI.
 
-## Usage
+## MCP Tools
 
-Start the dashboard server:
+- `get_quota`: Fetch live model quota percentages, reset countdowns, credits, and active model status.
+- `open_dashboard`: Ensure the web dashboard server is active (default port 3838) and optionally launch the default browser (`openBrowser: true`).
+
+## Manual Usage
+
+Start the dashboard server directly:
 
 ```bash
 node plugins/quota-dashboard/server.js
