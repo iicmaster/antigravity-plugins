@@ -2,7 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.2.0 - 2026-08-17
+## 0.3.0 - 2026-08-17
+
+### Added
+
+- **Specialized AGY Workflow Skills**:
+  - `agy-diff-inspector`: Deep, 5-stage adversarial Git Diff analysis (Concurrency, Race conditions, Security boundary violations, Regressions, and missing tests).
+  - `agy-task-rescue`: Autonomous task rescue, scientific debugging, and RCA in an isolated background sandbox.
+  - `agy-advisor`: Independent technical advisor and architectural second-opinion consultant evaluating trade-offs, sanity checks, and blind spots.
+- **Quota Telemetry Skill**:
+  - `quota-guard`: Threshold monitoring, burn-rate calculation, automated protective alerting, and model downgrade recommendations.
+- **Sequential Thinking (`sqthink`) Integration**:
+  - Infused structured multi-stage reasoning pipelines, hypothesis falsification, adversarial Black-Hat auditing, and confidence levels into all specialized skills.
+
+### Changed
+
+- Reorganized skill taxonomy into laser-focused, domain-specific skills.
+- Consolidated artifact and Thai prose editing into `artifact-sftp` (PR #17).
+
 
 ### Added
 
