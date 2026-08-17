@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.4.0 - 2026-08-17
+
+### Added
+
+- **Quota Dashboard Multi-tier Alert & Notification System**:
+  - **Web Audio Chimes**: Synthesized audio chimes (Web Audio API) for warning, critical, and recovery/reset events.
+  - **Browser Push Notifications**: Native browser notifications via Notification API with automatic permission prompt.
+  - **macOS Native Alerts**: Integrated `osascript` desktop notifications with system alert sounds (`Ping`, `Basso`, `Hero`).
+  - **In-App Toast Container**: Real-time stackable toast alerts for immediate in-page visibility.
+  - **Notification Settings Modal**: Interactive configuration modal for alert thresholds (warning/critical %), notification cooldown minutes, sound effects, browser push, and reset alerts.
+  - **Interactive Notification Tester**: `/api/notifications/test` endpoint and in-UI test button for rapid verification of audio, push, and toast alerts.
+- **Account Identity & Profile Display**:
+  - Dedicated Google Account identity card showing account display name, email, avatar image with dynamic initials fallback, authentication method, token type, and expiration metadata.
+- **Automated Test Expansion**:
+  - Test suites extended to cover notification endpoints, account info extraction, modal UI bindings, and MCP server dynamic versioning.
+
 ## 0.3.0 - 2026-08-17
 
 ### Added
@@ -20,6 +36,7 @@ All notable changes to this project will be documented in this file.
 - Reorganized skill taxonomy into laser-focused, domain-specific skills.
 - Consolidated artifact and Thai prose editing into `artifact-sftp` (PR #17).
 
+## 0.2.0 - 2026-08-17
 
 ### Added
 

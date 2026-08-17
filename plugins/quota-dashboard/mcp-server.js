@@ -9,6 +9,15 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const PLUGIN_VERSION = (() => {
+  try {
+    return JSON.parse(
+      fs.readFileSync(path.join(__dirname, 'plugin.json'), 'utf8')
+    ).version || '1.0.0';
+  } catch {
+    return '1.0.0';
+  }
+})();
 
 function runCommand(cmd) {
   return new Promise((resolve) => {
@@ -301,7 +310,7 @@ async function handle(message) {
         sendResult(id, {
           protocolVersion: params?.protocolVersion ?? "2024-11-05",
           capabilities: { tools: {} },
-          serverInfo: { name: "quota-dashboard", version: "1.0.0" }
+          serverInfo: { name: "quota-dashboard", version: PLUGIN_VERSION }
         });
         break;
       case "ping":

@@ -25,18 +25,47 @@ test("quota dashboard plugin includes required server and frontend files", () =>
   assert.ok(fs.existsSync(path.join(DASHBOARD_DIR, "public", "style.css")), "style.css should exist");
 });
 
-test("quota dashboard server supports process.env.PORT", () => {
+test("quota dashboard server supports process.env.PORT, account extraction, and notification endpoints", () => {
   const serverCode = readText("server.js");
   assert.match(serverCode, /process\.env\.PORT || 3838/);
   assert.match(serverCode, /\/api\/quota/);
+  assert.match(serverCode, /getAccountInfo/);
+  assert.match(serverCode, /\/api\/notifications\/settings/);
+  assert.match(serverCode, /\/api\/notifications\/test/);
+  assert.match(serverCode, /evaluateQuotaAlerts/);
+  assert.match(serverCode, /sendOsNotification/);
+});
+
+test("quota dashboard UI includes account cards, notification controls, toast container, and settings modal", () => {
+  const html = readText("public/index.html");
+  assert.match(html, /id="accountName"/, "index.html should have accountName");
+  assert.match(html, /id="accountEmail"/, "index.html should have accountEmail");
+  assert.match(html, /id="notifBtn"/, "index.html should have notifBtn");
+  assert.match(html, /id="toastContainer"/, "index.html should have toastContainer");
+  assert.match(html, /id="notifModal"/, "index.html should have notifModal");
+
+  const css = readText("public/style.css");
+  assert.match(css, /\.metadata-strip/, "style.css should have metadata-strip styles");
+  assert.match(css, /\.meta-email/, "style.css should have meta-email styles");
+  assert.match(css, /\.toast-container/, "style.css should have toast container styles");
+  assert.match(css, /\.modal-overlay/, "style.css should have modal styles");
+
+  const js = readText("public/app.js");
+  assert.match(js, /accountNameEl/, "app.js should bind accountNameEl");
+  assert.match(js, /accountEmailEl/, "app.js should bind accountEmailEl");
+  assert.match(js, /playChime/, "app.js should have playChime function");
+  assert.match(js, /showToast/, "app.js should have showToast function");
+  assert.match(js, /showBrowserPush/, "app.js should have showBrowserPush function");
 });
 
 test("quota dashboard manifests are valid and structured properly", () => {
   const claudeManifest = readJson(".claude-plugin/plugin.json");
   const codexManifest = readJson(".codex-plugin/plugin.json");
+  const pluginManifest = readJson("plugin.json");
 
   assert.equal(claudeManifest.name, "quota-dashboard");
   assert.equal(codexManifest.name, "quota-dashboard");
+  assert.equal(pluginManifest.name, "quota-dashboard");
   assert.equal(codexManifest.interface.displayName, "Quota Monitor Dashboard");
 });
 

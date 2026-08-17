@@ -47,6 +47,13 @@
           <span class="pulse-dot" aria-hidden="true"></span>
           <span class="status-text">Connecting...</span>
         </div>
+        <button id="notifBtn" class="btn btn-icon" title="Notification Settings" aria-label="Notification Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span class="notif-badge hidden" id="notifBadge"></span>
+        </button>
         <button id="refreshBtn" class="btn btn-primary" title="Refresh Quota Data" aria-label="Refresh Quota Data">
           <svg class="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
             <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
@@ -65,45 +72,60 @@
       </div>
     </header>
 
-    <!-- Info Banner / Account Overview -->
-    <section class="overview-banner">
-      <div class="info-card">
-        <div class="info-card-header">
-          <div class="info-icon model-icon" aria-hidden="true">🤖</div>
+    <!-- Compact Metadata Strip -->
+    <section class="metadata-strip" aria-label="Account and System Status">
+      <div class="meta-item account-meta">
+        <div class="meta-avatar-wrap" id="accountAvatarWrap" aria-hidden="true">
+          <img id="accountAvatar" class="avatar-img hidden" alt="Google Account Avatar">
+          <span id="accountAvatarFallback">👤</span>
         </div>
-        <div class="info-content">
-          <span class="info-label">ACTIVE MODEL</span>
-          <strong class="info-value" id="activeModel" title="Active Model">...</strong>
-        </div>
-      </div>
-
-      <div class="info-card">
-        <div class="info-card-header">
-          <div class="info-icon credit-icon" aria-hidden="true">⚡</div>
-        </div>
-        <div class="info-content">
-          <span class="info-label">AI PREMIUM CREDITS</span>
-          <strong class="info-value" id="remainingCredits">...</strong>
+        <div class="meta-account-info">
+          <span class="meta-label">GOOGLE ACCOUNT</span>
+          <strong class="meta-email" id="accountEmail" title="Google Account Email">...</strong>
+          <span class="meta-subname" id="accountName" title="Account Name">...</span>
         </div>
       </div>
 
-      <div class="info-card">
-        <div class="info-card-header">
-          <div class="info-icon auth-icon" aria-hidden="true">🔐</div>
-        </div>
-        <div class="info-content">
-          <span class="info-label">AUTHENTICATION</span>
-          <strong class="info-value" id="authMethod">...</strong>
+      <div class="meta-divider" aria-hidden="true"></div>
+
+      <div class="meta-item">
+        <span class="meta-icon" aria-hidden="true">🤖</span>
+        <div class="meta-stacked">
+          <span class="meta-label">ACTIVE MODEL</span>
+          <div class="meta-model-wrap">
+            <strong class="meta-value" id="activeModel" title="Active Model">...</strong>
+            <span class="meta-badge" id="runningSpeedText">FAST</span>
+          </div>
         </div>
       </div>
 
-      <div class="info-card">
-        <div class="info-card-header">
-          <div class="info-icon clock-icon" aria-hidden="true">⏳</div>
+      <div class="meta-divider" aria-hidden="true"></div>
+
+      <div class="meta-item">
+        <span class="meta-icon" aria-hidden="true">⚡</span>
+        <div class="meta-stacked">
+          <span class="meta-label">AI CREDITS</span>
+          <strong class="meta-value" id="remainingCredits">...</strong>
         </div>
-        <div class="info-content">
-          <span class="info-label">LAST UPDATED</span>
-          <strong class="info-value" id="lastUpdated">...</strong>
+      </div>
+
+      <div class="meta-divider" aria-hidden="true"></div>
+
+      <div class="meta-item">
+        <span class="meta-icon" aria-hidden="true">🔐</span>
+        <div class="meta-stacked">
+          <span class="meta-label">AUTH</span>
+          <span class="meta-value meta-auth" id="authMethod">...</span>
+        </div>
+      </div>
+
+      <div class="meta-divider" aria-hidden="true"></div>
+
+      <div class="meta-item meta-item-right">
+        <span class="meta-icon" aria-hidden="true">⏳</span>
+        <div class="meta-stacked">
+          <span class="meta-label">UPDATED</span>
+          <span class="meta-time" id="lastUpdated">...</span>
         </div>
       </div>
     </section>
@@ -259,6 +281,120 @@
         <pre><code id="jsonCode">// Loading payload...</code></pre>
       </div>
     </footer>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container" role="region" aria-label="Notifications" aria-live="polite"></div>
+
+  <!-- Notification Settings Modal -->
+  <div id="notifModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">🔔</span>
+          <h2 id="modalTitle">Notification & Alert Settings</h2>
+        </div>
+        <button id="closeModalBtn" class="btn-close" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="setting-group">
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Enable Quota Alerts</span>
+              <span class="setting-desc">Master toggle for automated notifications</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="notifMasterToggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Sound Alerts (Web Audio)</span>
+              <span class="setting-desc">Melodic chime when thresholds breach or reset</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="notifSoundToggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Browser Push Notification</span>
+              <span class="setting-desc">Desktop alert when tab is backgrounded</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="notifBrowserToggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">OS Native Notification (macOS)</span>
+              <span class="setting-desc">Direct banner alert from background daemon</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="notifOsToggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Notify on Quota Reset</span>
+              <span class="setting-desc">Celebratory chime when 100% quota restores</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="notifResetToggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="threshold-section">
+          <h3>Thresholds & Timing</h3>
+          <div class="threshold-grid">
+            <div class="input-field">
+              <label for="warningThresholdInput">Warning Threshold</label>
+              <div class="input-unit">
+                <input type="number" id="warningThresholdInput" min="5" max="50" value="30">
+                <span>%</span>
+              </div>
+            </div>
+
+            <div class="input-field">
+              <label for="criticalThresholdInput">Critical Threshold</label>
+              <div class="input-unit">
+                <input type="number" id="criticalThresholdInput" min="1" max="25" value="15">
+                <span>%</span>
+              </div>
+            </div>
+
+            <div class="input-field">
+              <label for="cooldownInput">Alert Cooldown</label>
+              <div class="input-unit">
+                <input type="number" id="cooldownInput" min="1" max="120" value="15">
+                <span>mins</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="testNotifBtn" class="btn btn-secondary">
+          <span>🧪 Test Notification</span>
+        </button>
+        <div class="modal-action-btns">
+          <button id="cancelModalBtn" class="btn btn-ghost">Cancel</button>
+          <button id="saveNotifBtn" class="btn btn-primary">Save Settings</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>
