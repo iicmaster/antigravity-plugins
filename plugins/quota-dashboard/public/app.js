@@ -1,7 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // Top bar controls
   const refreshBtn = document.getElementById('refreshBtn');
   const autoRefreshToggle = document.getElementById('autoRefreshToggle');
   const connectionStatus = document.getElementById('connectionStatus');
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const upgradeLinkEl = document.getElementById('upgradeLink');
+  const pluginVersionEl = document.getElementById('pluginVersion');
+
+  // Metadata strip elements
   const activeModelEl = document.getElementById('activeModel');
   const accountNameEl = document.getElementById('accountName');
   const accountEmailEl = document.getElementById('accountEmail');
@@ -9,9 +15,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const accountAvatarFallbackEl = document.getElementById('accountAvatarFallback');
   const runningSpeedTextEl = document.getElementById('runningSpeedText');
   const remainingCreditsEl = document.getElementById('remainingCredits');
-  const upgradeLinkEl = document.getElementById('upgradeLink');
   const authMethodEl = document.getElementById('authMethod');
   const lastUpdatedEl = document.getElementById('lastUpdated');
+
+  // Primary Gemini 4 elements
+  const gemini4GroupEl = document.getElementById('gemini4Group');
+  const gemini4GroupTitleEl = document.getElementById('gemini4GroupTitle');
+  const gemini4ActiveBadgeEl = document.getElementById('gemini4ActiveBadge');
+  const copySwitchGemini4Btn = document.getElementById('copySwitchGemini4Btn');
+  const gemini4MetersContainerEl = document.getElementById('gemini4MetersContainer');
+  const gemini4WeeklyTitleEl = document.getElementById('gemini4WeeklyTitle');
+  const meterGemini45hEl = document.getElementById('meter-gemini4-5h');
+
+  // Drawer elements
   const toggleJsonBtn = document.getElementById('toggleJsonBtn');
   const jsonDrawer = document.getElementById('jsonDrawer');
   const jsonCode = document.getElementById('jsonCode');
@@ -51,7 +67,57 @@ document.addEventListener('DOMContentLoaded', () => {
     notifyOnReset: true
   };
 
-  // Web Audio API Chime Synthesizer
+  // Quota Session History (for Sparklines and Burn Rate computation)
+  const quotaHistory = {
+    gemini4Weekly: [],
+    gemini45h: [],
+    geminiWeekly: [],
+    gemini5h: [],
+    claudeWeekly: [],
+    claude5h: []
+  };
+
+  // ==========================================================================
+  // 1. Theme Management (Light / Dark Ambient)
+  // ==========================================================================
+  function initTheme() {
+    const savedTheme = localStorage.getItem('antigravity_theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+
+    setTheme(initialTheme);
+
+    if (themeToggleBtn) {
+      themeToggleBtn.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+      });
+    }
+  }
+
+  function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('antigravity_theme', theme);
+
+    if (themeToggleBtn) {
+      const lightIcon = themeToggleBtn.querySelector('.theme-icon-light');
+      const darkIcon = themeToggleBtn.querySelector('.theme-icon-dark');
+      if (lightIcon && darkIcon) {
+        if (theme === 'dark') {
+          lightIcon.classList.add('hidden');
+          darkIcon.classList.remove('hidden');
+        } else {
+          lightIcon.classList.remove('hidden');
+          darkIcon.classList.add('hidden');
+        }
+      }
+    }
+  }
+
+  // ==========================================================================
+  // 2. Web Audio API Chime Synthesizer
+  // ==========================================================================
   function getAudioContext() {
     if (!audioCtx) {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -78,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
       gain.connect(ctx.destination);
 
       if (type === 'critical') {
-        // Urgent 3-tone chime (587Hz -> 440Hz -> 330Hz)
+        // Urgent 3-tone chord (587Hz -> 440Hz -> 330Hz)
         osc.frequency.setValueAtTime(587.33, now); // D5
         osc.frequency.setValueAtTime(440.00, now + 0.12); // A4
         osc.frequency.setValueAtTime(329.63, now + 0.24); // E4
@@ -87,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
         osc.start(now);
         osc.stop(now + 0.45);
       } else if (type === 'reset' || type === 'success') {
-        // Melodic upward chime (440Hz -> 554Hz -> 659Hz)
+        // Melodic upward chord (440Hz -> 554Hz -> 659Hz)
         osc.frequency.setValueAtTime(440.00, now); // A4
         osc.frequency.setValueAtTime(554.37, now + 0.12); // C#5
         osc.frequency.setValueAtTime(659.25, now + 0.24); // E5
@@ -96,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         osc.start(now);
         osc.stop(now + 0.5);
       } else {
-        // Warm 2-tone warning chime (440Hz -> 523Hz)
+        // Warm 2-tone warning chord (440Hz -> 523Hz)
         osc.frequency.setValueAtTime(440.00, now); // A4
         osc.frequency.setValueAtTime(523.25, now + 0.15); // C5
         gain.gain.setValueAtTime(0.15, now);
@@ -109,7 +175,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Browser Push Notifications
+  // ==========================================================================
+  // 3. Browser Push & Toast System
+  // ==========================================================================
   function requestBrowserPushPermission() {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
@@ -124,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const notif = new Notification(title, {
         body: message,
         icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%234F46E5"><circle cx="12" cy="12" r="10"/></svg>',
-        silent: true // Audio handled by Web Audio API
+        silent: true
       });
       setTimeout(() => notif.close(), 6000);
     } catch (e) {
@@ -132,8 +200,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Toast System
   function showToast(type, title, message) {
+    if (!toastContainer) return;
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
 
@@ -159,7 +227,6 @@ document.addEventListener('DOMContentLoaded', () => {
       toast.classList.add('show');
     });
 
-    // Auto dismiss after 6s
     setTimeout(() => {
       dismissToast(toast);
     }, 6000);
@@ -172,7 +239,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 350);
   }
 
-  // Handle incoming alert events
   function handleAlerts(alerts) {
     if (!alerts || !alerts.length) return;
 
@@ -182,9 +248,12 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast(alert.level, alert.title, alert.message);
     });
 
-    notifBadge.classList.remove('hidden');
+    if (notifBadge) notifBadge.classList.remove('hidden');
   }
 
+  // ==========================================================================
+  // 4. Notification Settings Modal
+  // ==========================================================================
   async function fetchNotificationSettings() {
     try {
       const res = await fetch('/api/notifications/settings');
@@ -201,14 +270,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applySettingsToModal(settings) {
-    notifMasterToggle.checked = !!settings.enabled;
-    notifSoundToggle.checked = !!settings.soundEnabled;
-    notifBrowserToggle.checked = !!settings.browserPushEnabled;
-    notifOsToggle.checked = !!settings.osNativeEnabled;
-    notifResetToggle.checked = !!settings.notifyOnReset;
-    warningThresholdInput.value = settings.warningThreshold ?? 30;
-    criticalThresholdInput.value = settings.criticalThreshold ?? 15;
-    cooldownInput.value = settings.cooldownMinutes ?? 15;
+    if (notifMasterToggle) notifMasterToggle.checked = !!settings.enabled;
+    if (notifSoundToggle) notifSoundToggle.checked = !!settings.soundEnabled;
+    if (notifBrowserToggle) notifBrowserToggle.checked = !!settings.browserPushEnabled;
+    if (notifOsToggle) notifOsToggle.checked = !!settings.osNativeEnabled;
+    if (notifResetToggle) notifResetToggle.checked = !!settings.notifyOnReset;
+    if (warningThresholdInput) warningThresholdInput.value = settings.warningThreshold ?? 30;
+    if (criticalThresholdInput) criticalThresholdInput.value = settings.criticalThreshold ?? 15;
+    if (cooldownInput) cooldownInput.value = settings.cooldownMinutes ?? 15;
   }
 
   async function saveSettingsFromModal() {
@@ -257,15 +326,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function openNotifModal() {
     applySettingsToModal(notificationSettings);
-    notifModal.classList.remove('hidden');
-    notifBadge.classList.add('hidden');
+    if (notifModal) notifModal.classList.remove('hidden');
+    if (notifBadge) notifBadge.classList.add('hidden');
     requestBrowserPushPermission();
   }
 
   function closeNotifModal() {
-    notifModal.classList.add('hidden');
+    if (notifModal) notifModal.classList.add('hidden');
   }
 
+  // ==========================================================================
+  // 5. Data Fetching & UI Rendering
+  // ==========================================================================
   async function fetchQuotaData() {
     setLoadingState(true);
 
@@ -287,37 +359,41 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (err) {
       console.error('Fetch error:', err);
-      setConnectionStatus(false, 'Connection Error');
+      setConnectionStatus(false, 'Disconnected');
     } finally {
       setLoadingState(false);
     }
   }
 
   function setLoadingState(isLoading) {
+    if (!refreshBtn) return;
     const spinIcon = refreshBtn.querySelector('.spin-icon');
     if (isLoading) {
-      spinIcon.classList.add('spinning');
+      if (spinIcon) spinIcon.classList.add('spinning');
       refreshBtn.disabled = true;
     } else {
-      spinIcon.classList.remove('spinning');
+      if (spinIcon) spinIcon.classList.remove('spinning');
       refreshBtn.disabled = false;
     }
   }
 
   function setConnectionStatus(isOnline, text) {
+    if (!connectionStatus) return;
     const pulseDot = connectionStatus.querySelector('.pulse-dot');
     const statusText = connectionStatus.querySelector('.status-text');
 
-    statusText.textContent = text;
-    if (isOnline) {
-      pulseDot.classList.remove('error');
-    } else {
-      pulseDot.classList.add('error');
+    if (statusText) statusText.textContent = text;
+    if (pulseDot) {
+      if (isOnline) {
+        pulseDot.classList.remove('error');
+      } else {
+        pulseDot.classList.add('error');
+      }
     }
   }
 
   function updateUI(data) {
-    // Account details (Display Google Email prominently)
+    // 1. Account Details
     const email = data.account?.email || '';
     const name = data.account?.accountName || data.account?.username || 'Google User';
 
@@ -346,33 +422,82 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     if (runningSpeedTextEl && data.runningSpeed) {
-      runningSpeedTextEl.textContent = `Speed: ${data.runningSpeed.toUpperCase()}`;
+      runningSpeedTextEl.textContent = `SPEED: ${data.runningSpeed.toUpperCase()}`;
     }
 
-    // Header & Info cards
-    const modelName = data.activeModel || 'Gemini 3.6 Flash (High)';
-    activeModelEl.textContent = modelName;
-    activeModelEl.title = modelName;
-    remainingCreditsEl.textContent = `${data.credits?.remaining ?? 0} Credits`;
-    authMethodEl.textContent = (data.account?.authMethod || data.token?.authMethod || 'Consumer').toUpperCase();
+    // 2. Header & Info Card values
+    if (pluginVersionEl && data.version) {
+      pluginVersionEl.textContent = data.version.startsWith('v') ? data.version : `v${data.version}`;
+      pluginVersionEl.title = `Plugin Version ${data.version}`;
+    }
 
-    if (data.credits?.upgradeUrl) {
+    const modelName = data.activeModel || 'Gemini 4 Argon (Medium)';
+    const isPrimaryActive = /^Gemini 4\b/i.test(modelName) || Boolean(data.isPrimaryModelActive);
+
+    if (activeModelEl) {
+      activeModelEl.textContent = modelName;
+      activeModelEl.title = modelName;
+    }
+
+    if (gemini4ActiveBadgeEl) {
+      if (isPrimaryActive) {
+        gemini4ActiveBadgeEl.textContent = `● ACTIVE · ${modelName}`;
+        gemini4ActiveBadgeEl.classList.remove('standby');
+        if (copySwitchGemini4Btn) copySwitchGemini4Btn.classList.add('hidden');
+      } else {
+        gemini4ActiveBadgeEl.textContent = 'STANDBY · PRIMARY TIER';
+        gemini4ActiveBadgeEl.classList.add('standby');
+        if (copySwitchGemini4Btn) copySwitchGemini4Btn.classList.remove('hidden');
+      }
+    }
+
+    if (remainingCreditsEl) {
+      remainingCreditsEl.textContent = `${data.credits?.remaining ?? 0} Credits`;
+    }
+    if (authMethodEl) {
+      authMethodEl.textContent = (data.account?.authMethod || data.token?.authMethod || 'Consumer').toUpperCase();
+    }
+
+    if (data.credits?.upgradeUrl && upgradeLinkEl) {
       upgradeLinkEl.href = data.credits.upgradeUrl;
     }
 
     const now = new Date();
-    lastUpdatedEl.textContent = now.toLocaleTimeString('en-US');
+    if (lastUpdatedEl) {
+      lastUpdatedEl.textContent = now.toLocaleTimeString('en-GB', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
 
-    // Update raw JSON
-    jsonCode.textContent = JSON.stringify(data, null, 2);
+    // 3. Raw JSON Drawer
+    if (jsonCode) {
+      jsonCode.textContent = JSON.stringify(data, null, 2);
+    }
 
-    // Process Quotas
+    // 4. Process Quotas & Render Meters
     const quotas = data.quotas || [];
+    let hasGemini45h = false;
 
     quotas.forEach(q => {
       let targetPrefix = '';
 
-      if (q.category === 'Gemini Models') {
+      if (/^Gemini 4\b/i.test(q.category)) {
+        if (gemini4GroupTitleEl && q.category) {
+          gemini4GroupTitleEl.textContent = q.category;
+        }
+        if (q.limitType.includes('Five Hour') || q.limitType.includes('5-Hour')) {
+          targetPrefix = 'gemini45h';
+          hasGemini45h = true;
+        } else {
+          targetPrefix = 'gemini4Weekly';
+          if (gemini4WeeklyTitleEl && q.limitType) {
+            gemini4WeeklyTitleEl.textContent = q.limitType;
+          }
+        }
+      } else if (q.category === 'Gemini Models') {
         if (q.limitType.includes('Weekly')) targetPrefix = 'geminiWeekly';
         else if (q.limitType.includes('Five Hour')) targetPrefix = 'gemini5h';
       } else if (q.category === 'Claude and GPT models') {
@@ -381,16 +506,29 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (targetPrefix) {
-        updateMeterCard(targetPrefix, q.percentage, q.resetAt);
+        updateMeterCard(targetPrefix, q.percentage, q.resetAt, q.category);
       }
     });
+
+    if (meterGemini45hEl && gemini4MetersContainerEl) {
+      if (hasGemini45h) {
+        meterGemini45hEl.classList.remove('hidden');
+        gemini4MetersContainerEl.classList.add('two-cols');
+      } else {
+        meterGemini45hEl.classList.add('hidden');
+        gemini4MetersContainerEl.classList.remove('two-cols');
+      }
+    }
   }
 
-  function updateMeterCard(prefix, percent, resetAt) {
+  function updateMeterCard(prefix, percent, resetAt, category) {
     const percentEl = document.getElementById(`${prefix}Percent`);
     const fillEl = document.getElementById(`${prefix}Fill`);
     const badgeEl = document.getElementById(`${prefix}Badge`);
     const timerEl = document.getElementById(`${prefix}Timer`);
+    const burnRateEl = document.getElementById(`${prefix}BurnRate`);
+    const sparklineEl = document.getElementById(`${prefix}Sparkline`);
+    const actionsEl = document.getElementById(`${prefix}Actions`);
 
     if (!percentEl || !fillEl || !badgeEl || !timerEl) return;
 
@@ -401,11 +539,14 @@ document.addEventListener('DOMContentLoaded', () => {
     fillEl.className = 'progress-bar-fill';
     badgeEl.className = 'status-badge';
 
-    if (percent > (notificationSettings.warningThreshold ?? 30)) {
+    const warningThresh = notificationSettings.warningThreshold ?? 30;
+    const criticalThresh = notificationSettings.criticalThreshold ?? 15;
+
+    if (percent > warningThresh) {
       fillEl.classList.add('fill-healthy');
       badgeEl.classList.add('badge-healthy');
       badgeEl.textContent = 'Healthy';
-    } else if (percent > (notificationSettings.criticalThreshold ?? 15)) {
+    } else if (percent > criticalThresh) {
       fillEl.classList.add('fill-warning');
       badgeEl.classList.add('badge-warning');
       badgeEl.textContent = 'Warning';
@@ -415,9 +556,162 @@ document.addEventListener('DOMContentLoaded', () => {
       badgeEl.textContent = 'Critical';
     }
 
+    // Record History & Calculate Burn Rate
+    recordQuotaHistory(prefix, percent);
+    updateBurnRateBadge(prefix, burnRateEl);
+    renderSparkline(prefix, sparklineEl);
+
+    // Render Contextual Quick Actions
+    renderContextualActions(prefix, percent, actionsEl, category);
+
     startCountdownTimer(prefix, resetAt, timerEl);
   }
 
+  // ==========================================================================
+  // 6. Quota Velocity, Burn Rate & Sparklines
+  // ==========================================================================
+  function recordQuotaHistory(key, percent) {
+    if (!quotaHistory[key]) quotaHistory[key] = [];
+    const now = Date.now();
+
+    // Prevent duplicate entries within 5 seconds
+    const last = quotaHistory[key][quotaHistory[key].length - 1];
+    if (last && now - last.time < 5000) {
+      last.percent = percent;
+      return;
+    }
+
+    quotaHistory[key].push({ time: now, percent });
+    // Keep last 10 points
+    if (quotaHistory[key].length > 10) {
+      quotaHistory[key].shift();
+    }
+  }
+
+  function updateBurnRateBadge(key, element) {
+    if (!element) return;
+    const history = quotaHistory[key] || [];
+
+    if (history.length < 2) {
+      element.className = 'burn-rate-badge rate-stable';
+      element.textContent = '🟢 Stable';
+      return;
+    }
+
+    const first = history[0];
+    const latest = history[history.length - 1];
+    const deltaPercent = first.percent - latest.percent;
+    const elapsedHours = (latest.time - first.time) / (1000 * 60 * 60);
+
+    if (latest.percent === 100 && deltaPercent <= 0) {
+      element.className = 'burn-rate-badge rate-stable';
+      element.textContent = '✨ 100% Quota';
+    } else if (deltaPercent > 0 && elapsedHours > 0.001) {
+      const burnRatePerHour = Math.round(deltaPercent / Math.max(elapsedHours, 0.1));
+      if (burnRatePerHour >= 15) {
+        element.className = 'burn-rate-badge rate-rapid';
+        element.textContent = `🔥 ~${burnRatePerHour}%/hr`;
+      } else {
+        element.className = 'burn-rate-badge rate-moderate';
+        element.textContent = `⚡ ~${burnRatePerHour}%/hr`;
+      }
+    } else {
+      element.className = 'burn-rate-badge rate-stable';
+      element.textContent = '🟢 Stable';
+    }
+  }
+
+  function renderSparkline(key, container) {
+    if (!container) return;
+    const history = quotaHistory[key] || [];
+    if (history.length < 2) {
+      container.innerHTML = '<span style="font-size: 0.6875rem; color: var(--text-muted);">Collecting session telemetry...</span>';
+      return;
+    }
+
+    const width = container.clientWidth || 220;
+    const height = 28;
+    const points = history.map((item, idx) => {
+      const x = (idx / (history.length - 1)) * (width - 12) + 6;
+      const y = height - (item.percent / 100) * (height - 8) - 4;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+
+    const pathData = `M ${points.split(' ').join(' L ')}`;
+    const areaData = `${pathData} L ${width - 6},${height} L 6,${height} Z`;
+
+    container.innerHTML = `
+      <svg class="sparkline-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+        <path d="${areaData}" fill="var(--sparkline-fill)" />
+        <path d="${pathData}" fill="none" stroke="var(--sparkline-stroke)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    `;
+  }
+
+  function renderContextualActions(prefix, percent, container, category) {
+    if (!container) return;
+    const warningThresh = notificationSettings.warningThreshold ?? 30;
+    const criticalThresh = notificationSettings.criticalThreshold ?? 15;
+    const isGemini4Card = prefix.startsWith('gemini4');
+
+    if (percent <= criticalThresh) {
+      container.classList.remove('hidden');
+      const primaryActionCmd = isGemini4Card ? 'agy --model gemini-4-argon-low' : 'agy --model gemini-4-argon-medium';
+      const primaryActionLabel = isGemini4Card ? '💎 Use Gemini 4 (Low)' : '💎 Switch to Gemini 4';
+
+      container.innerHTML = `
+        <div class="quick-action-header">
+          <span>⚠️ Quota Critical (<${criticalThresh}%) - Recommended Actions:</span>
+        </div>
+        <div class="quick-action-btns">
+          <button class="quick-action-btn" data-action="switch-primary">
+            <span>${primaryActionLabel}</span>
+          </button>
+          <button class="quick-action-btn" data-action="switch-flash">
+            <span>⚡ Use Gemini 3.8 Flash</span>
+          </button>
+          <a href="https://antigravity.google/g1-upgrade" target="_blank" class="quick-action-btn">
+            <span>👑 Upgrade Plan ↗</span>
+          </a>
+        </div>
+      `;
+
+      const primaryBtn = container.querySelector('[data-action="switch-primary"]');
+      if (primaryBtn) {
+        primaryBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(primaryActionCmd);
+          showToast('success', 'Model Switch Command Copied', `Copied: \`${primaryActionCmd}\` to clipboard`);
+        });
+      }
+
+      const switchBtn = container.querySelector('[data-action="switch-flash"]');
+      if (switchBtn) {
+        switchBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText('agy --model gemini-3.8-flash-high');
+          showToast('success', 'Model Switch Command Copied', 'Copied: `agy --model gemini-3.8-flash-high` to clipboard');
+        });
+      }
+    } else if (percent <= warningThresh) {
+      container.classList.remove('hidden');
+      container.innerHTML = `
+        <div class="quick-action-header" style="color: var(--accent-amber);">
+          <span>⚡ Quota Warning (<${warningThresh}%)</span>
+        </div>
+        <div class="quick-action-btns">
+          <span style="font-size: 0.75rem; color: var(--text-secondary);">
+            Tip: Compress prompts or avoid running unconstrained autonomous background loops.
+          </span>
+        </div>
+      `;
+    } else {
+      container.classList.add('hidden');
+      container.innerHTML = '';
+    }
+  }
+
+  // ==========================================================================
+  // 7. Relative Countdown Timers
+  // ==========================================================================
   function startCountdownTimer(key, resetAtStr, element) {
     if (countdownTimers[key]) {
       clearInterval(countdownTimers[key]);
@@ -434,7 +728,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const exactFormatted = resetDate.toLocaleTimeString('en-US', {
+    const exactFormatted = resetDate.toLocaleTimeString('en-GB', {
+      hour12: false,
       hour: '2-digit',
       minute: '2-digit',
       month: 'short',
@@ -472,47 +767,68 @@ document.addEventListener('DOMContentLoaded', () => {
     countdownTimers[key] = setInterval(updateClock, 1000);
   }
 
-  // Event Listeners
-  refreshBtn.addEventListener('click', () => {
-    fetchQuotaData();
-  });
+  // ==========================================================================
+  // 8. Event Listeners & Initialization
+  // ==========================================================================
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      fetchQuotaData();
+    });
+  }
 
-  notifBtn.addEventListener('click', openNotifModal);
-  closeModalBtn.addEventListener('click', closeNotifModal);
-  cancelModalBtn.addEventListener('click', closeNotifModal);
-  saveNotifBtn.addEventListener('click', saveSettingsFromModal);
-  testNotifBtn.addEventListener('click', triggerTestAlert);
+  if (copySwitchGemini4Btn) {
+    copySwitchGemini4Btn.addEventListener('click', () => {
+      navigator.clipboard.writeText('agy --model gemini-4-argon-medium');
+      showToast('success', 'Primary Model Command Copied', 'Copied: `agy --model gemini-4-argon-medium` to clipboard');
+    });
+  }
 
-  notifBrowserToggle.addEventListener('change', (e) => {
-    if (e.target.checked) requestBrowserPushPermission();
-  });
+  if (notifBtn) notifBtn.addEventListener('click', openNotifModal);
+  if (closeModalBtn) closeModalBtn.addEventListener('click', closeNotifModal);
+  if (cancelModalBtn) cancelModalBtn.addEventListener('click', closeNotifModal);
+  if (saveNotifBtn) saveNotifBtn.addEventListener('click', saveSettingsFromModal);
+  if (testNotifBtn) testNotifBtn.addEventListener('click', triggerTestAlert);
 
-  notifModal.addEventListener('click', (e) => {
-    if (e.target === notifModal) closeNotifModal();
-  });
+  if (notifBrowserToggle) {
+    notifBrowserToggle.addEventListener('change', (e) => {
+      if (e.target.checked) requestBrowserPushPermission();
+    });
+  }
 
-  autoRefreshToggle.addEventListener('change', (e) => {
-    if (e.target.checked) {
-      startAutoRefresh();
-    } else {
-      stopAutoRefresh();
-    }
-  });
+  if (notifModal) {
+    notifModal.addEventListener('click', (e) => {
+      if (e.target === notifModal) closeNotifModal();
+    });
+  }
 
-  toggleJsonBtn.addEventListener('click', () => {
-    jsonDrawer.classList.toggle('hidden');
-    toggleJsonBtn.classList.toggle('active');
-  });
+  if (autoRefreshToggle) {
+    autoRefreshToggle.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        startAutoRefresh();
+      } else {
+        stopAutoRefresh();
+      }
+    });
+  }
 
-  copyJsonBtn.addEventListener('click', () => {
-    if (currentRawData) {
-      navigator.clipboard.writeText(JSON.stringify(currentRawData, null, 2));
-      copyJsonBtn.textContent = 'Copied!';
-      setTimeout(() => {
-        copyJsonBtn.textContent = 'Copy JSON';
-      }, 2000);
-    }
-  });
+  if (toggleJsonBtn && jsonDrawer) {
+    toggleJsonBtn.addEventListener('click', () => {
+      jsonDrawer.classList.toggle('hidden');
+      toggleJsonBtn.classList.toggle('active');
+    });
+  }
+
+  if (copyJsonBtn) {
+    copyJsonBtn.addEventListener('click', () => {
+      if (currentRawData) {
+        navigator.clipboard.writeText(JSON.stringify(currentRawData, null, 2));
+        copyJsonBtn.textContent = 'Copied!';
+        setTimeout(() => {
+          copyJsonBtn.textContent = 'Copy JSON';
+        }, 2000);
+      }
+    });
+  }
 
   function startAutoRefresh() {
     stopAutoRefresh();
@@ -526,10 +842,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Initial load
+  // Initialize
+  initTheme();
   fetchNotificationSettings();
   fetchQuotaData();
-  if (autoRefreshToggle.checked) {
+  if (autoRefreshToggle && autoRefreshToggle.checked) {
     startAutoRefresh();
   }
 });

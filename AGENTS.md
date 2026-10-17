@@ -5,7 +5,8 @@
 
 ## Commands
 - `npm test` - Run the Node test suite.
-- `npm run validate` - Alias for `npm test`.
+- `npm run check:spec` - Run the agent-plugins.org v1.0.0 pre-publish specification gate.
+- `npm run validate` - Run all tests and the pre-publish specification gate.
 - `node plugins/agy/scripts/agy-companion.mjs setup` - Check local AGY runtime support.
 
 ## Architecture

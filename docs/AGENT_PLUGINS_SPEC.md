@@ -243,3 +243,4 @@ This repository fully complies with Agent Plugins v1.0.0 ([agent-plugins.org](ht
 | Portable MCP Config | `plugins/agy/.mcp.json` | `tests/agy-mcp-server.test.mjs` |
 | Reverse-Domain Extensions | `.claude-plugin/` and `.codex-plugin/` per plugin | Marketplace test suite |
 | Version Synchronization | Synced across `package.json`, marketplaces, and plugin manifests | `every version-bearing manifest matches the package version` test |
+| Pre-Publish Specification Gate | `scripts/check-agent-plugins.mjs`, `npm run check:spec`, `prepublishOnly` lifecycle hook | `tests/prepublish-gate.test.mjs` |

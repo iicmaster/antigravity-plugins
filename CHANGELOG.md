@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.5.0 - 2026-10-17
+
+### Added
+
+- **Gemini 4 Argon Primary Model Support**:
+  - Dedicated primary hero quota card (`#gemini4Group`) for **Gemini 4 Argon** (`gemini-4-argon-medium` / `high` / `low`) with active flagship status indicator (`● ACTIVE`), burn-rate velocity badge, session trend sparkline, and 1-click CLI switch helper.
+  - Prioritized `Gemini 4 Argon` quota metrics (`isPrimary: true`) and alert tracking (`gemini4Weekly` / `gemini45h`) in both `server.js` and `mcp-server.js`.
+  - Updated default primary model fallback to `Gemini 4 Argon (Medium)` and refreshed quick-action model switch commands (`gemini-4-argon-low`, `gemini-4-argon-medium`, `gemini-3.8-flash-high`).
+- **Quota Dashboard UX Redesign & Telemetry**:
+  - Refactored top bar into 3 semantic control clusters (Telemetry & Auto-Sync, Utility & Theme Controls, Primary Actions).
+  - Added Light / Dark Ambient theme toggle with `localStorage` persistence.
+  - Added real-time CLI runtime account resolution from `agy` session logs with multi-profile Chrome avatar enrichment.
+  - Added plugin version badge (`#pluginVersion`), 24-hour time formatting (`en-GB`, `hour12: false`), and custom vector `favicon.svg`.
+- **Agent Plugins v1.0.0 Pre-Publish Gate**:
+  - Added `scripts/check-agent-plugins.mjs` (`npm run check:spec` & `prepublishOnly` hook) and `docs/AGENT_PLUGINS_SPEC.md` enforcing `https://agent-plugins.org/schemas/1.0.0/plugin.schema.json` and `mcp.schema.json`.
+
 ## 0.4.0 - 2026-08-17
 
 ### Added

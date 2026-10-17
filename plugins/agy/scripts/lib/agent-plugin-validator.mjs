@@ -3,7 +3,10 @@ import path from "node:path";
 
 const REVERSE_DOMAIN_REGEX = /^[a-z0-9]+(?:\.[a-z0-9-]+)+$/i;
 const SEMVER_REGEX = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
-const PLUGIN_NAME_REGEX = /^[a-z0-9-_]+$/i;
+const PLUGIN_NAME_REGEX = /^(?!.*(?:--|\.\.))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i;
+
+export const AGENT_PLUGIN_SCHEMA_URL = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
+export const AGENT_PLUGIN_MCP_SCHEMA_URL = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json";
 
 /**
  * Parses YAML frontmatter from a SKILL.md file content.
@@ -56,6 +59,8 @@ export function parseSkillFrontmatter(content) {
  *
  * @param {string} pluginDir - Path to the plugin root directory.
  * @param {Object} [options] - Validation options.
+ * @param {boolean} [options.requireSchema=true] - Whether to require $schema in manifests.
+ * @param {string} [options.expectedVersion] - Expected version to match (e.g. from package.json).
  * @returns {{ valid: boolean, errors: string[], warnings: string[], details: Object }}
  */
 export function validateAgentPlugin(pluginDir, options = {}) {
@@ -107,6 +112,27 @@ export function validateAgentPlugin(pluginDir, options = {}) {
   let mcpRelPath = null;
 
   if (manifest) {
+    // Check $schema
+    const requireSchema = options.requireSchema !== false;
+    if (requireSchema) {
+      if (!manifest.$schema || typeof manifest.$schema !== "string") {
+        errors.push("plugin.json: '$schema' field is required");
+      } else if (
+        !manifest.$schema.startsWith("https://agent-plugins.org/schemas/")
+      ) {
+        errors.push(
+          `plugin.json: '$schema' must start with https://agent-plugins.org/schemas/ (found '${manifest.$schema}')`
+        );
+      } else if (
+        manifest.$schema !== AGENT_PLUGIN_SCHEMA_URL &&
+        !/^https:\/\/agent-plugins\.org\/schemas\/\d+\.\d+\.\d+\/plugin\.schema\.json$/.test(manifest.$schema)
+      ) {
+        warnings.push(
+          `plugin.json: '$schema' does not match canonical 1.0.0 URL '${AGENT_PLUGIN_SCHEMA_URL}'`
+        );
+      }
+    }
+
     // Check required fields
     if (!manifest.name || typeof manifest.name !== "string" || !manifest.name.trim()) {
       errors.push("plugin.json: 'name' field is required and must be a non-empty string");
@@ -118,6 +144,10 @@ export function validateAgentPlugin(pluginDir, options = {}) {
       errors.push("plugin.json: 'version' field is required");
     } else if (!SEMVER_REGEX.test(manifest.version)) {
       errors.push("plugin.json: 'version' must be a valid semver string (e.g. 1.0.0)");
+    } else if (options.expectedVersion && manifest.version !== options.expectedVersion) {
+      errors.push(
+        `plugin.json: Version mismatch (expected ${options.expectedVersion}, found ${manifest.version})`
+      );
     }
 
     if (!manifest.description || typeof manifest.description !== "string" || !manifest.description.trim()) {
@@ -126,7 +156,12 @@ export function validateAgentPlugin(pluginDir, options = {}) {
 
     // Skills path validation
     if (!manifest.skills || typeof manifest.skills !== "string") {
-      errors.push("plugin.json: 'skills' field is required and must be a relative path string");
+      const defaultSkillsDir = path.join(pluginDir, "skills");
+      if (fs.existsSync(defaultSkillsDir) && fs.statSync(defaultSkillsDir).isDirectory()) {
+        errors.push("plugin.json: 'skills' field is required and must be a relative path string (e.g. './skills/')");
+      } else {
+        errors.push("plugin.json: 'skills' field is required and must be a relative path string");
+      }
     } else {
       skillsRelPath = manifest.skills;
       const resolvedSkillsPath = path.resolve(pluginDir, skillsRelPath);
@@ -216,6 +251,26 @@ export function validateAgentPlugin(pluginDir, options = {}) {
     }
 
     if (mcpConfig) {
+      const requireSchema = options.requireSchema !== false;
+      if (requireSchema) {
+        if (!mcpConfig.$schema || typeof mcpConfig.$schema !== "string") {
+          errors.push(`MCP config '${mcpRelPath}': '$schema' field is required`);
+        } else if (
+          !mcpConfig.$schema.startsWith("https://agent-plugins.org/schemas/")
+        ) {
+          errors.push(
+            `MCP config '${mcpRelPath}': '$schema' must start with https://agent-plugins.org/schemas/ (found '${mcpConfig.$schema}')`
+          );
+        } else if (
+          mcpConfig.$schema !== AGENT_PLUGIN_MCP_SCHEMA_URL &&
+          !/^https:\/\/agent-plugins\.org\/schemas\/\d+\.\d+\.\d+\/mcp\.schema\.json$/.test(mcpConfig.$schema)
+        ) {
+          warnings.push(
+            `MCP config '${mcpRelPath}': '$schema' does not match canonical 1.0.0 URL '${AGENT_PLUGIN_MCP_SCHEMA_URL}'`
+          );
+        }
+      }
+
       const servers = mcpConfig.mcpServers && typeof mcpConfig.mcpServers === "object"
         ? mcpConfig.mcpServers
         : (typeof mcpConfig === "object" ? mcpConfig : null);
@@ -340,5 +395,48 @@ export function validateAgentPlugin(pluginDir, options = {}) {
     errors,
     warnings,
     details
+  };
+}
+
+/**
+ * Validates all agent plugins found under a plugins directory.
+ *
+ * @param {string} pluginsRootDir - Root directory containing plugin subdirectories.
+ * @param {Object} [options] - Options passed to validateAgentPlugin.
+ * @returns {{ valid: boolean, plugins: Array<{ name: string, dir: string, valid: boolean, errors: string[], warnings: string[], details: Object }> }}
+ */
+export function validateAllAgentPlugins(pluginsRootDir, options = {}) {
+  if (!fs.existsSync(pluginsRootDir)) {
+    return {
+      valid: false,
+      plugins: []
+    };
+  }
+
+  const entries = fs.readdirSync(pluginsRootDir, { withFileTypes: true });
+  const pluginDirs = entries.filter((e) => e.isDirectory() && !e.name.startsWith("."));
+  const plugins = [];
+  let allValid = true;
+
+  for (const dir of pluginDirs) {
+    const pluginPath = path.join(pluginsRootDir, dir.name);
+    const manifestPath = path.join(pluginPath, "plugin.json");
+
+    if (fs.existsSync(manifestPath)) {
+      const result = validateAgentPlugin(pluginPath, options);
+      if (!result.valid) {
+        allValid = false;
+      }
+      plugins.push({
+        name: dir.name,
+        dir: pluginPath,
+        ...result
+      });
+    }
+  }
+
+  return {
+    valid: allValid && plugins.length > 0,
+    plugins
   };
 }

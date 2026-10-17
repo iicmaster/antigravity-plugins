@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Antigravity Quota Monitor - Real-Time Quota Tracker</title>
   <meta name="description" content="Real-time Antigravity (AGY) quota and usage status dashboard.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -37,38 +38,58 @@
           </svg>
         </div>
         <div class="brand-text">
-          <h1>Antigravity <span>Quota Monitor</span></h1>
-          <p class="subtitle">Real-time quota and usage status monitor on this machine</p>
+          <div class="brand-title-row">
+            <h1>Antigravity <span>Quota Monitor</span></h1>
+            <span class="version-tag" id="pluginVersion" title="Plugin Version">v0.5.0</span>
+          </div>
+          <p class="subtitle">Real-time quota governance and usage telemetry</p>
         </div>
       </div>
 
+      <!-- Refactored Top Bar Controls with Clear Semantic Clusters -->
       <div class="header-controls">
-        <div class="status-indicator" id="connectionStatus" role="status" aria-live="polite">
-          <span class="pulse-dot" aria-hidden="true"></span>
-          <span class="status-text">Connecting...</span>
+        <!-- Cluster 1: System Telemetry & Auto-Sync -->
+        <div class="control-cluster telemetry-cluster" title="System Connection & Sync Telemetry">
+          <div class="status-indicator" id="connectionStatus" role="status" aria-live="polite">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            <span class="status-text">Connecting...</span>
+          </div>
+          <label class="auto-refresh-toggle" title="Auto-refresh telemetry every 30 seconds">
+            <input type="checkbox" id="autoRefreshToggle" role="switch" aria-label="Toggle auto-refresh every 30 seconds" checked>
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Auto-Sync</span>
+          </label>
         </div>
-        <button id="notifBtn" class="btn btn-icon" title="Notification Settings" aria-label="Notification Settings">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-          </svg>
-          <span class="notif-badge hidden" id="notifBadge"></span>
-        </button>
-        <button id="refreshBtn" class="btn btn-primary" title="Refresh Quota Data" aria-label="Refresh Quota Data">
-          <svg class="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-          </svg>
-          <span>Refresh Data</span>
-        </button>
-        <a id="upgradeLink" href="https://antigravity.google/g1-upgrade" target="_blank" class="upgrade-btn header-upgrade-btn" aria-label="Upgrade Antigravity Plan">
-          <span>Upgrade</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
-        </a>
-        <label class="auto-refresh-toggle" title="Auto-refresh every 30 seconds">
-          <input type="checkbox" id="autoRefreshToggle" role="switch" aria-label="Toggle auto-refresh every 30 seconds" checked>
-          <span class="toggle-slider"></span>
-          <span class="toggle-label">Auto-Refresh (30s)</span>
-        </label>
+
+        <!-- Cluster 2: Utility & Theme Controls -->
+        <div class="control-cluster utility-cluster">
+          <button id="themeToggleBtn" class="btn btn-icon theme-btn" title="Toggle Light/Dark Theme" aria-label="Toggle Light/Dark Theme">
+            <span class="theme-icon-light" aria-hidden="true">☀️</span>
+            <span class="theme-icon-dark hidden" aria-hidden="true">🌙</span>
+          </button>
+          <button id="notifBtn" class="btn btn-icon notif-btn" title="Alert & Sound Settings" aria-label="Notification Settings">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span class="notif-badge hidden" id="notifBadge"></span>
+          </button>
+        </div>
+
+        <!-- Cluster 3: Primary Action & External Plan Link -->
+        <div class="control-cluster action-cluster">
+          <button id="refreshBtn" class="btn btn-primary refresh-action-btn" title="Fetch Latest Quota Data" aria-label="Refresh Quota Data">
+            <svg class="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+            </svg>
+            <span>Refresh Data</span>
+          </button>
+          <a id="upgradeLink" href="https://antigravity.google/g1-upgrade" target="_blank" class="upgrade-btn header-upgrade-btn" aria-label="Manage or Upgrade Antigravity Plan">
+            <span class="upgrade-icon">👑</span>
+            <span>Upgrade Plan</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+          </a>
+        </div>
       </div>
     </header>
 
@@ -132,12 +153,115 @@
 
     <!-- Main Quota Grid -->
     <main class="dashboard-grid">
+      <!-- Gemini 4 Primary Flagship Model Section -->
+      <section class="quota-group-card primary-group-card" id="gemini4Group">
+        <div class="group-header">
+          <div class="group-title">
+            <span class="group-logo gemini4-logo">💎</span>
+            <div>
+              <div class="group-title-row">
+                <h2 id="gemini4GroupTitle">Gemini 4 Argon</h2>
+                <span class="primary-model-pill" id="gemini4ActiveBadge">● PRIMARY ACTIVE</span>
+              </div>
+              <span class="group-desc">Primary flagship frontier reasoning allocation (Low / Medium / High)</span>
+            </div>
+          </div>
+          <div class="group-badge-cluster">
+            <button id="copySwitchGemini4Btn" class="btn-chip hidden" title="Copy command to switch to Gemini 4 Argon (Medium)">
+              ⚡ Use Gemini 4
+            </button>
+            <span class="group-badge badge-primary-tier">PRIMARY · GOOGLE AI</span>
+          </div>
+        </div>
+
+        <div class="meters-container primary-meters-container" id="gemini4MetersContainer">
+          <!-- Gemini 4 Weekly -->
+          <div class="meter-card" id="meter-gemini4-weekly">
+            <div class="meter-header">
+              <div class="meter-title">
+                <div class="meter-title-row">
+                  <h3 id="gemini4WeeklyTitle">Gemini 4 Argon Weekly Limit</h3>
+                  <span class="burn-rate-badge" id="gemini4WeeklyBurnRate">🟢 Stable</span>
+                </div>
+                <span class="meter-subtitle">Dedicated flagship weekly rolling allocation</span>
+              </div>
+              <div class="meter-percent" id="gemini4WeeklyPercent">...</div>
+            </div>
+
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="gemini4WeeklyFill" style="width: 0%"></div>
+            </div>
+
+            <div class="meter-footer">
+              <span class="status-badge" id="gemini4WeeklyBadge">Loading...</span>
+              <div class="reset-time-box">
+                <span class="reset-icon">⏰</span>
+                <span class="reset-label">Reset:</span>
+                <span class="reset-timer" id="gemini4WeeklyTimer">...</span>
+              </div>
+            </div>
+
+            <!-- Mini Sparkline History -->
+            <div class="meter-sparkline-wrap" id="gemini4WeeklySparklineWrap">
+              <div class="sparkline-header">
+                <span class="sparkline-label">Recent Session Trend</span>
+              </div>
+              <div class="sparkline-container" id="gemini4WeeklySparkline"></div>
+            </div>
+
+            <!-- Contextual Quick Action Box -->
+            <div class="meter-quick-actions hidden" id="gemini4WeeklyActions"></div>
+          </div>
+
+          <!-- Gemini 4 5-Hour (Dynamic: shown automatically if CLI reports 5h limit for Gemini 4) -->
+          <div class="meter-card hidden" id="meter-gemini4-5h">
+            <div class="meter-header">
+              <div class="meter-title">
+                <div class="meter-title-row">
+                  <h3>5-Hour Limit</h3>
+                  <span class="burn-rate-badge" id="gemini45hBurnRate">🟢 Stable</span>
+                </div>
+                <span class="meter-subtitle">5-Hour sliding window quota</span>
+              </div>
+              <div class="meter-percent" id="gemini45hPercent">...</div>
+            </div>
+
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="gemini45hFill" style="width: 0%"></div>
+            </div>
+
+            <div class="meter-footer">
+              <span class="status-badge" id="gemini45hBadge">Loading...</span>
+              <div class="reset-time-box">
+                <span class="reset-icon">⏰</span>
+                <span class="reset-label">Reset:</span>
+                <span class="reset-timer" id="gemini45hTimer">...</span>
+              </div>
+            </div>
+
+            <!-- Mini Sparkline History -->
+            <div class="meter-sparkline-wrap" id="gemini45hSparklineWrap">
+              <div class="sparkline-header">
+                <span class="sparkline-label">Recent Session Trend</span>
+              </div>
+              <div class="sparkline-container" id="gemini45hSparkline"></div>
+            </div>
+
+            <!-- Contextual Quick Action Box -->
+            <div class="meter-quick-actions hidden" id="gemini45hActions"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- Gemini Models Section -->
       <section class="quota-group-card" id="geminiGroup">
         <div class="group-header">
           <div class="group-title">
             <span class="group-logo gemini-logo">✨</span>
-            <h2>Gemini Models</h2>
+            <div>
+              <h2>Gemini Models</h2>
+              <span class="group-desc">Gemini 3.8 Flash &amp; standard reasoning quotas</span>
+            </div>
           </div>
           <span class="group-badge">GOOGLE AI</span>
         </div>
@@ -147,8 +271,11 @@
           <div class="meter-card" id="meter-gemini-weekly">
             <div class="meter-header">
               <div class="meter-title">
-                <h3>Weekly Limit</h3>
-                <span class="meter-subtitle">Weekly Quota Remaining</span>
+                <div class="meter-title-row">
+                  <h3>Weekly Limit</h3>
+                  <span class="burn-rate-badge" id="geminiWeeklyBurnRate">🟢 Stable</span>
+                </div>
+                <span class="meter-subtitle">Weekly rolling allocation</span>
               </div>
               <div class="meter-percent" id="geminiWeeklyPercent">...</div>
             </div>
@@ -161,18 +288,32 @@
               <span class="status-badge" id="geminiWeeklyBadge">Loading...</span>
               <div class="reset-time-box">
                 <span class="reset-icon">⏰</span>
-                <span class="reset-label">Reset In:</span>
+                <span class="reset-label">Reset:</span>
                 <span class="reset-timer" id="geminiWeeklyTimer">...</span>
               </div>
             </div>
+
+            <!-- Mini Sparkline History -->
+            <div class="meter-sparkline-wrap" id="geminiWeeklySparklineWrap">
+              <div class="sparkline-header">
+                <span class="sparkline-label">Recent Session Trend</span>
+              </div>
+              <div class="sparkline-container" id="geminiWeeklySparkline"></div>
+            </div>
+
+            <!-- Contextual Quick Action Box -->
+            <div class="meter-quick-actions hidden" id="geminiWeeklyActions"></div>
           </div>
 
           <!-- Gemini 5-Hour -->
           <div class="meter-card" id="meter-gemini-5h">
             <div class="meter-header">
               <div class="meter-title">
-                <h3>5-Hour Limit</h3>
-                <span class="meter-subtitle">5-Hour Window Quota</span>
+                <div class="meter-title-row">
+                  <h3>5-Hour Limit</h3>
+                  <span class="burn-rate-badge" id="gemini5hBurnRate">🟢 Stable</span>
+                </div>
+                <span class="meter-subtitle">5-Hour sliding window quota</span>
               </div>
               <div class="meter-percent" id="gemini5hPercent">...</div>
             </div>
@@ -185,10 +326,21 @@
               <span class="status-badge" id="gemini5hBadge">Loading...</span>
               <div class="reset-time-box">
                 <span class="reset-icon">⏰</span>
-                <span class="reset-label">Reset In:</span>
+                <span class="reset-label">Reset:</span>
                 <span class="reset-timer" id="gemini5hTimer">...</span>
               </div>
             </div>
+
+            <!-- Mini Sparkline History -->
+            <div class="meter-sparkline-wrap" id="gemini5hSparklineWrap">
+              <div class="sparkline-header">
+                <span class="sparkline-label">Recent Session Trend</span>
+              </div>
+              <div class="sparkline-container" id="gemini5hSparkline"></div>
+            </div>
+
+            <!-- Contextual Quick Action Box -->
+            <div class="meter-quick-actions hidden" id="gemini5hActions"></div>
           </div>
         </div>
       </section>
@@ -198,7 +350,10 @@
         <div class="group-header">
           <div class="group-title">
             <span class="group-logo claude-logo">🧠</span>
-            <h2>Claude & GPT Models</h2>
+            <div>
+              <h2>Claude &amp; GPT Models</h2>
+              <span class="group-desc">Anthropic Claude 5.5 Opus/Sonnet &amp; GPT-OSS 120B</span>
+            </div>
           </div>
           <span class="group-badge">ANTHROPIC / OPENAI</span>
         </div>
@@ -208,8 +363,11 @@
           <div class="meter-card" id="meter-claude-weekly">
             <div class="meter-header">
               <div class="meter-title">
-                <h3>Weekly Limit</h3>
-                <span class="meter-subtitle">Weekly Quota Remaining</span>
+                <div class="meter-title-row">
+                  <h3>Weekly Limit</h3>
+                  <span class="burn-rate-badge" id="claudeWeeklyBurnRate">🟢 Stable</span>
+                </div>
+                <span class="meter-subtitle">Weekly quota remaining</span>
               </div>
               <div class="meter-percent" id="claudeWeeklyPercent">...</div>
             </div>
@@ -222,18 +380,32 @@
               <span class="status-badge" id="claudeWeeklyBadge">Loading...</span>
               <div class="reset-time-box">
                 <span class="reset-icon">⏰</span>
-                <span class="reset-label">Reset In:</span>
+                <span class="reset-label">Reset:</span>
                 <span class="reset-timer" id="claudeWeeklyTimer">...</span>
               </div>
             </div>
+
+            <!-- Mini Sparkline History -->
+            <div class="meter-sparkline-wrap" id="claudeWeeklySparklineWrap">
+              <div class="sparkline-header">
+                <span class="sparkline-label">Recent Session Trend</span>
+              </div>
+              <div class="sparkline-container" id="claudeWeeklySparkline"></div>
+            </div>
+
+            <!-- Contextual Quick Action Box -->
+            <div class="meter-quick-actions hidden" id="claudeWeeklyActions"></div>
           </div>
 
           <!-- Claude/GPT 5-Hour -->
           <div class="meter-card" id="meter-claude-5h">
             <div class="meter-header">
               <div class="meter-title">
-                <h3>5-Hour Limit</h3>
-                <span class="meter-subtitle">5-Hour Window Quota</span>
+                <div class="meter-title-row">
+                  <h3>5-Hour Limit</h3>
+                  <span class="burn-rate-badge" id="claude5hBurnRate">🟢 Stable</span>
+                </div>
+                <span class="meter-subtitle">5-Hour sliding window quota</span>
               </div>
               <div class="meter-percent" id="claude5hPercent">...</div>
             </div>
@@ -246,10 +418,21 @@
               <span class="status-badge" id="claude5hBadge">Loading...</span>
               <div class="reset-time-box">
                 <span class="reset-icon">⏰</span>
-                <span class="reset-label">Reset In:</span>
+                <span class="reset-label">Reset:</span>
                 <span class="reset-timer" id="claude5hTimer">...</span>
               </div>
             </div>
+
+            <!-- Mini Sparkline History -->
+            <div class="meter-sparkline-wrap" id="claude5hSparklineWrap">
+              <div class="sparkline-header">
+                <span class="sparkline-label">Recent Session Trend</span>
+              </div>
+              <div class="sparkline-container" id="claude5hSparkline"></div>
+            </div>
+
+            <!-- Contextual Quick Action Box -->
+            <div class="meter-quick-actions hidden" id="claude5hActions"></div>
           </div>
         </div>
       </section>

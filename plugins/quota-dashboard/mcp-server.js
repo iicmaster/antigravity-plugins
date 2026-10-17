@@ -13,9 +13,9 @@ const PLUGIN_VERSION = (() => {
   try {
     return JSON.parse(
       fs.readFileSync(path.join(__dirname, 'plugin.json'), 'utf8')
-    ).version || '1.0.0';
+    ).version || '0.5.0';
   } catch {
-    return '1.0.0';
+    return '0.5.0';
   }
 })();
 
@@ -31,10 +31,16 @@ function runCommand(cmd) {
   });
 }
 
+const DEFAULT_PRIMARY_MODEL = 'Gemini 4 Argon (Medium)';
+
+function isGemini4Category(category = '') {
+  return /^Gemini 4\b/i.test(String(category).trim());
+}
+
 function parseUsageOutput(rawText) {
   const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
   const results = [];
-  
+
   for (const line of lines) {
     const parts = line.split('\t').map(p => p.trim());
     if (parts.length >= 3) {
@@ -48,10 +54,13 @@ function parseUsageOutput(rawText) {
         category,
         limitType,
         percentage: isNaN(percentage) ? 0 : percentage,
-        resetAt
+        resetAt,
+        isPrimary: isGemini4Category(category)
       });
     }
   }
+
+  results.sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
   return results;
 }
 
@@ -85,22 +94,166 @@ function getLocalSettings() {
   return {};
 }
 
-function getTokenInfo() {
+function getAccountInfo() {
+  const logDir = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'log');
+  const cliLogSymlink = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'cli.log');
+  const googleAccountsPath = path.join(os.homedir(), '.gemini', 'google_accounts.json');
+  const oauthCredsPath = path.join(os.homedir(), '.gemini', 'oauth_creds.json');
+  const browserPrefPath = path.join(os.homedir(), '.gemini', 'antigravity-browser-profile', 'Default', 'Preferences');
+  const chromeBaseDir = path.join(os.homedir(), 'Library', 'Application Support', 'Google', 'Chrome');
   const tokenPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'antigravity-oauth-token');
+
+  let authMethod = 'Consumer';
+  let accountName = '';
+  let email = '';
+  let expiry = null;
+  let tokenType = 'Bearer';
+  let pictureUrl = null;
+
+  const targetLogs = [];
+  if (fs.existsSync(cliLogSymlink)) {
+    try {
+      const real = fs.realpathSync(cliLogSymlink);
+      targetLogs.push(real);
+    } catch {}
+  }
+  if (fs.existsSync(logDir)) {
+    try {
+      const files = fs.readdirSync(logDir)
+        .filter(f => f.startsWith('cli-') && f.endsWith('.log'))
+        .map(f => ({ full: path.join(logDir, f), mtime: fs.statSync(path.join(logDir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+      for (const f of files.slice(0, 5)) {
+        if (!targetLogs.includes(f.full)) targetLogs.push(f.full);
+      }
+    } catch {}
+  }
+
+  for (const logPath of targetLogs) {
+    try {
+      const content = fs.readFileSync(logPath, 'utf8');
+      const authMatch = content.match(/applyAuthResult:\s*email=([^\s,]+)(?:,\s*authMethod=([^\s,]+))?/);
+      if (authMatch) {
+        email = authMatch[1].trim();
+        if (authMatch[2]) authMethod = authMatch[2].trim();
+        break;
+      }
+      const oauthSuccess = content.match(/OAuth:\s*authenticated successfully as ([^\s\r\n]+)/);
+      if (oauthSuccess) {
+        email = oauthSuccess[1].trim();
+        break;
+      }
+    } catch {}
+  }
+
+  if (!email) {
+    try {
+      if (fs.existsSync(googleAccountsPath)) {
+        const parsed = JSON.parse(fs.readFileSync(googleAccountsPath, 'utf8'));
+        if (parsed.active && typeof parsed.active === 'string') {
+          email = parsed.active;
+        }
+      }
+    } catch (e) {}
+  }
+
+  try {
+    if (fs.existsSync(oauthCredsPath)) {
+      const creds = JSON.parse(fs.readFileSync(oauthCredsPath, 'utf8'));
+      if (creds.token_type) tokenType = creds.token_type;
+      if (creds.expiry_date) expiry = new Date(creds.expiry_date).toISOString();
+
+      if (creds.id_token) {
+        const parts = creds.id_token.split('.');
+        if (parts.length >= 2) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+          if (!email && payload.email) email = payload.email;
+          if (email === payload.email) {
+            if (payload.name) accountName = payload.name;
+            else if (payload.given_name) accountName = payload.given_name;
+            if (payload.picture) pictureUrl = payload.picture;
+            if (payload.exp && !expiry) expiry = new Date(payload.exp * 1000).toISOString();
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
+  const prefCandidates = [browserPrefPath];
+  if (fs.existsSync(chromeBaseDir)) {
+    try {
+      const entries = fs.readdirSync(chromeBaseDir);
+      for (const entry of entries) {
+        if (entry === 'Default' || entry.startsWith('Profile ')) {
+          prefCandidates.push(path.join(chromeBaseDir, entry, 'Preferences'));
+        }
+      }
+    } catch {}
+  }
+
+  for (const prefFile of prefCandidates) {
+    if ((accountName && pictureUrl) || !fs.existsSync(prefFile)) continue;
+    try {
+      const json = JSON.parse(fs.readFileSync(prefFile, 'utf8'));
+      if (Array.isArray(json.account_info) && json.account_info.length > 0) {
+        const matched = email ? json.account_info.find(a => a.email && a.email.toLowerCase() === email.toLowerCase()) : json.account_info[0];
+        if (matched) {
+          if (!accountName && (matched.full_name || matched.given_name)) {
+            accountName = matched.full_name || matched.given_name;
+          }
+          if (!pictureUrl && (matched.picture_url || matched.last_downloaded_image_url_with_size)) {
+            pictureUrl = matched.picture_url || matched.last_downloaded_image_url_with_size;
+          }
+        }
+      }
+    } catch {}
+  }
+
   try {
     if (fs.existsSync(tokenPath)) {
       const content = fs.readFileSync(tokenPath, 'utf8');
       const parsed = JSON.parse(content);
-      return {
-        authMethod: parsed.auth_method || 'consumer',
-        expiry: parsed.token?.expiry || null,
-        tokenType: parsed.token?.token_type || 'Bearer'
-      };
+      if (parsed.auth_method) authMethod = parsed.auth_method;
+      if (!email && (parsed.email || parsed.user_email || parsed.account)) {
+        email = parsed.email || parsed.user_email || parsed.account;
+      }
+      if (!accountName && (parsed.name || parsed.account_name || parsed.user_name)) {
+        accountName = parsed.name || parsed.account_name || parsed.user_name;
+      }
+      if (parsed.token?.expiry && !expiry) expiry = parsed.token.expiry;
+      if (parsed.token?.token_type && !tokenType) tokenType = parsed.token.token_type;
     }
-  } catch (e) {
-    console.error('Error reading token:', e);
+  } catch (e) {}
+
+  const sysUser = os.userInfo().username || process.env.USER || 'User';
+  if (!email) {
+    email = `${sysUser}@${os.hostname().replace(/\.local$/, '')}`;
   }
-  return {};
+  if (!accountName) {
+    accountName = email.includes('@') ? email.split('@')[0] : sysUser;
+  }
+
+  return {
+    accountName,
+    email,
+    username: sysUser,
+    authMethod: authMethod.charAt(0).toUpperCase() + authMethod.slice(1),
+    expiry,
+    tokenType,
+    pictureUrl
+  };
+}
+
+function getTokenInfo() {
+  const acc = getAccountInfo();
+  return {
+    authMethod: acc.authMethod,
+    expiry: acc.expiry,
+    tokenType: acc.tokenType,
+    accountName: acc.accountName,
+    email: acc.email,
+    pictureUrl: acc.pictureUrl
+  };
 }
 
 function isPortInUse(port, host = '127.0.0.1') {
@@ -230,11 +383,17 @@ async function handleTool(name, args = {}) {
     const settings = getLocalSettings();
     const token = getTokenInfo();
 
+    const activeModel = settings.model || DEFAULT_PRIMARY_MODEL;
+
     const payload = {
       success: true,
+      version: PLUGIN_VERSION,
       timestamp: new Date().toISOString(),
-      activeModel: settings.model || 'Gemini 3.6 Flash (High)',
+      activeModel,
+      primaryModel: DEFAULT_PRIMARY_MODEL,
+      isPrimaryModelActive: isGemini4Category(activeModel),
       runningSpeed: settings.runningLightSpeed || 'fast',
+      account: getAccountInfo(),
       quotas,
       credits,
       token

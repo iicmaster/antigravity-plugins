@@ -52,11 +52,13 @@ To add a new plugin to this repository:
    - Claude Code: `.claude-plugin/marketplace.json`
    - Codex: `.agents/plugins/marketplace.json`
 
-3. **Validate the Plugin**:
-   Run the repository test suite to verify structural integrity, schema compliance, SemVer matching across manifests, and runtime safety:
+3. **Validate the Plugin & Pre-Publish Gate**:
+   Run the repository test suite and pre-publish gate to verify structural integrity, schema compliance against agent-plugins.org v1.0.0, SemVer matching across manifests, and runtime safety:
    ```bash
    npm test
-   # or
+   # or run the dedicated pre-publish specification gate
+   npm run check:spec
+   # or run both tests and gate
    npm run validate
    ```
 

@@ -10,6 +10,15 @@ const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3838;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const PLUGIN_VERSION = (() => {
+  try {
+    return JSON.parse(
+      fs.readFileSync(path.join(__dirname, 'plugin.json'), 'utf8')
+    ).version || '0.5.0';
+  } catch {
+    return '0.5.0';
+  }
+})();
 
 function runCommand(cmd) {
   return new Promise((resolve) => {
@@ -21,6 +30,12 @@ function runCommand(cmd) {
       }
     });
   });
+}
+
+const DEFAULT_PRIMARY_MODEL = 'Gemini 4 Argon (Medium)';
+
+function isGemini4Category(category = '') {
+  return /^Gemini 4\b/i.test(String(category).trim());
 }
 
 function parseUsageOutput(rawText) {
@@ -40,10 +55,14 @@ function parseUsageOutput(rawText) {
         category,
         limitType,
         percentage: isNaN(percentage) ? 0 : percentage,
-        resetAt
+        resetAt,
+        isPrimary: isGemini4Category(category)
       });
     }
   }
+
+  // Promote Gemini 4 (primary flagship model) to the front of the quota list
+  results.sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
   return results;
 }
 
@@ -78,65 +97,144 @@ function getLocalSettings() {
 }
 
 function getAccountInfo() {
-  const tokenPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'antigravity-oauth-token');
+  const logDir = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'log');
+  const cliLogSymlink = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'cli.log');
+  const googleAccountsPath = path.join(os.homedir(), '.gemini', 'google_accounts.json');
+  const oauthCredsPath = path.join(os.homedir(), '.gemini', 'oauth_creds.json');
   const browserPrefPath = path.join(os.homedir(), '.gemini', 'antigravity-browser-profile', 'Default', 'Preferences');
-  const chromePrefPath = path.join(os.homedir(), 'Library', 'Application Support', 'Google', 'Chrome', 'Default', 'Preferences');
+  const chromeBaseDir = path.join(os.homedir(), 'Library', 'Application Support', 'Google', 'Chrome');
+  const tokenPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'antigravity-oauth-token');
 
-  let authMethod = 'Consumer (Google One)';
+  let authMethod = 'Consumer';
   let accountName = '';
   let email = '';
   let expiry = null;
   let tokenType = 'Bearer';
   let pictureUrl = null;
 
-  // 1. Primary: Check Antigravity Browser Profile Preferences for logged-in Google Account
+  // 1. Primary: Extract active authenticated user directly from agy CLI runtime logs
+  const targetLogs = [];
+  if (fs.existsSync(cliLogSymlink)) {
+    try {
+      const real = fs.realpathSync(cliLogSymlink);
+      targetLogs.push(real);
+    } catch {}
+  }
+  if (fs.existsSync(logDir)) {
+    try {
+      const files = fs.readdirSync(logDir)
+        .filter(f => f.startsWith('cli-') && f.endsWith('.log'))
+        .map(f => ({ full: path.join(logDir, f), mtime: fs.statSync(path.join(logDir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+      for (const f of files.slice(0, 5)) {
+        if (!targetLogs.includes(f.full)) targetLogs.push(f.full);
+      }
+    } catch {}
+  }
+
+  for (const logPath of targetLogs) {
+    try {
+      const content = fs.readFileSync(logPath, 'utf8');
+      const authMatch = content.match(/applyAuthResult:\s*email=([^\s,]+)(?:,\s*authMethod=([^\s,]+))?/);
+      if (authMatch) {
+        email = authMatch[1].trim();
+        if (authMatch[2]) authMethod = authMatch[2].trim();
+        break;
+      }
+      const oauthSuccess = content.match(/OAuth:\s*authenticated successfully as ([^\s\r\n]+)/);
+      if (oauthSuccess) {
+        email = oauthSuccess[1].trim();
+        break;
+      }
+    } catch {}
+  }
+
+  // 2. Secondary: Check ~/.gemini/google_accounts.json
+  if (!email) {
+    try {
+      if (fs.existsSync(googleAccountsPath)) {
+        const parsed = JSON.parse(fs.readFileSync(googleAccountsPath, 'utf8'));
+        if (parsed.active && typeof parsed.active === 'string') {
+          email = parsed.active;
+        }
+      }
+    } catch (e) {
+      console.error('Error reading google_accounts.json:', e);
+    }
+  }
+
+  // 3. Read ~/.gemini/oauth_creds.json and decode JWT id_token
   try {
-    if (fs.existsSync(browserPrefPath)) {
-      const content = fs.readFileSync(browserPrefPath, 'utf8');
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed.account_info) && parsed.account_info.length > 0) {
-        const acc = parsed.account_info[0];
-        if (acc.email) email = acc.email;
-        if (acc.full_name) accountName = acc.full_name;
-        else if (acc.given_name) accountName = acc.given_name;
-        if (acc.picture_url) pictureUrl = acc.picture_url;
+    if (fs.existsSync(oauthCredsPath)) {
+      const creds = JSON.parse(fs.readFileSync(oauthCredsPath, 'utf8'));
+      if (creds.token_type) tokenType = creds.token_type;
+      if (creds.expiry_date) expiry = new Date(creds.expiry_date).toISOString();
+
+      if (creds.id_token) {
+        const parts = creds.id_token.split('.');
+        if (parts.length >= 2) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+          if (!email && payload.email) email = payload.email;
+          if (email === payload.email) {
+            if (payload.name) accountName = payload.name;
+            else if (payload.given_name) accountName = payload.given_name;
+            if (payload.picture) pictureUrl = payload.picture;
+            if (payload.exp && !expiry) expiry = new Date(payload.exp * 1000).toISOString();
+          }
+        }
       }
     }
   } catch (e) {
-    console.error('Error reading browser preferences:', e);
+    console.error('Error reading oauth_creds.json:', e);
   }
 
-  // 2. Secondary: Try OAuth Token file
+  // 4. Enrich account name and avatar by scanning browser and Chrome profiles
+  const prefCandidates = [browserPrefPath];
+  if (fs.existsSync(chromeBaseDir)) {
+    try {
+      const entries = fs.readdirSync(chromeBaseDir);
+      for (const entry of entries) {
+        if (entry === 'Default' || entry.startsWith('Profile ')) {
+          prefCandidates.push(path.join(chromeBaseDir, entry, 'Preferences'));
+        }
+      }
+    } catch {}
+  }
+
+  for (const prefFile of prefCandidates) {
+    if ((accountName && pictureUrl) || !fs.existsSync(prefFile)) continue;
+    try {
+      const json = JSON.parse(fs.readFileSync(prefFile, 'utf8'));
+      if (Array.isArray(json.account_info) && json.account_info.length > 0) {
+        const matched = email ? json.account_info.find(a => a.email && a.email.toLowerCase() === email.toLowerCase()) : json.account_info[0];
+        if (matched) {
+          if (!accountName && (matched.full_name || matched.given_name)) {
+            accountName = matched.full_name || matched.given_name;
+          }
+          if (!pictureUrl && (matched.picture_url || matched.last_downloaded_image_url_with_size)) {
+            pictureUrl = matched.picture_url || matched.last_downloaded_image_url_with_size;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 5. Check token file if present
   try {
     if (fs.existsSync(tokenPath)) {
       const content = fs.readFileSync(tokenPath, 'utf8');
       const parsed = JSON.parse(content);
       if (parsed.auth_method) authMethod = parsed.auth_method;
-      if (parsed.token?.expiry) expiry = parsed.token.expiry;
-      if (parsed.token?.token_type) tokenType = parsed.token.token_type;
       if (!email && (parsed.email || parsed.user_email || parsed.account)) {
         email = parsed.email || parsed.user_email || parsed.account;
       }
       if (!accountName && (parsed.name || parsed.account_name || parsed.user_name)) {
         accountName = parsed.name || parsed.account_name || parsed.user_name;
       }
+      if (parsed.token?.expiry && !expiry) expiry = parsed.token.expiry;
+      if (parsed.token?.token_type && !tokenType) tokenType = parsed.token.token_type;
     }
-  } catch (e) {
-    console.error('Error reading token:', e);
-  }
-
-  // 3. Fallback: Chrome Preferences
-  if (!email && fs.existsSync(chromePrefPath)) {
-    try {
-      const content = fs.readFileSync(chromePrefPath, 'utf8');
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed.account_info) && parsed.account_info.length > 0) {
-        const acc = parsed.account_info[0];
-        if (acc.email) email = acc.email;
-        if (!accountName && acc.full_name) accountName = acc.full_name;
-      }
-    } catch {}
-  }
+  } catch (e) {}
 
   const sysUser = os.userInfo().username || process.env.USER || 'User';
   if (!email) {
@@ -150,7 +248,7 @@ function getAccountInfo() {
     accountName,
     email,
     username: sysUser,
-    authMethod,
+    authMethod: authMethod.charAt(0).toUpperCase() + authMethod.slice(1),
     expiry,
     tokenType,
     pictureUrl
@@ -211,6 +309,8 @@ function saveNotificationSettings(settings) {
 
 // In-memory alert state tracker for transition detection & cooldown
 const alertStateTracker = {
+  gemini4Weekly: { level: 'normal', lastAlertTime: 0, lastPercentage: 100 },
+  gemini45h: { level: 'normal', lastAlertTime: 0, lastPercentage: 100 },
   geminiWeekly: { level: 'normal', lastAlertTime: 0, lastPercentage: 100 },
   gemini5h: { level: 'normal', lastAlertTime: 0, lastPercentage: 100 },
   claudeWeekly: { level: 'normal', lastAlertTime: 0, lastPercentage: 100 },
@@ -241,7 +341,10 @@ function evaluateQuotaAlerts(quotas, settings) {
     let categoryLabel = q.category;
     let limitLabel = q.limitType;
 
-    if (q.category === 'Gemini Models') {
+    if (isGemini4Category(q.category)) {
+      if (q.limitType.includes('Five Hour') || q.limitType.includes('5-Hour')) key = 'gemini45h';
+      else key = 'gemini4Weekly';
+    } else if (q.category === 'Gemini Models') {
       if (q.limitType.includes('Weekly')) key = 'geminiWeekly';
       else if (q.limitType.includes('Five Hour')) key = 'gemini5h';
     } else if (q.category === 'Claude and GPT models') {
@@ -396,10 +499,15 @@ const server = http.createServer(async (req, res) => {
       const notifSettings = getNotificationSettings();
       const alerts = evaluateQuotaAlerts(quotas, notifSettings);
 
+      const activeModel = settings.model || DEFAULT_PRIMARY_MODEL;
+
       const payload = {
         success: true,
+        version: PLUGIN_VERSION,
         timestamp: new Date().toISOString(),
-        activeModel: settings.model || 'Gemini 3.6 Flash (High)',
+        activeModel,
+        primaryModel: DEFAULT_PRIMARY_MODEL,
+        isPrimaryModelActive: isGemini4Category(activeModel),
         runningSpeed: settings.runningLightSpeed || 'fast',
         account,
         quotas,
@@ -439,7 +547,8 @@ const server = http.createServer(async (req, res) => {
     '.js': 'application/javascript; charset=utf-8',
     '.json': 'application/json; charset=utf-8',
     '.svg': 'image/svg+xml',
-    '.png': 'image/png'
+    '.png': 'image/png',
+    '.ico': 'image/x-icon'
   };
 
   fs.readFile(filePath, (err, data) => {

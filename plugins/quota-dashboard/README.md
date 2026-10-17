@@ -4,9 +4,10 @@ Real-time Quota & Usage Monitor Web Dashboard for Antigravity (`agy`).
 
 ## Features
 
-- **Real-Time Quota Tracking**: Visual status bars and reset countdown timers for Gemini and Claude/GPT model quotas.
+- **Primary Model First (Gemini 4 Argon)**: Dedicated hero telemetry card and priority alert tracking for **Gemini 4 Argon** (`gemini-4-argon-medium` / `high` / `low`).
+- **Real-Time Quota Tracking**: Visual status bars, burn-rate velocity, session sparklines, and reset countdown timers for Gemini 4 Argon, Gemini 3.8 Flash, and Claude/GPT model quotas.
 - **AI Premium Credits**: View remaining credits and upgrade link.
-- **Account & Token Status**: Check active model and authentication method.
+- **Account & Token Status**: Check active model, primary model status, and real-time CLI authentication.
 - **RAW JSON Inspection**: One-click JSON view and copy functionality for debugging `agy` outputs.
 - **MCP Integration**: Stdio MCP tools to fetch live quota and automatically launch the dashboard browser UI.
 

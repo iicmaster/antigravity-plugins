@@ -18,7 +18,9 @@ Use this skill when you need to inspect or display real-time Antigravity (AGY) q
 
 ## API Endpoints
 - `GET http://localhost:3838/api/quota`: Returns JSON payload containing:
-  - `activeModel`: Active model name
-  - `quotas`: Usage percentages and reset timestamps for Gemini & Claude/GPT models
+  - `activeModel`: Active model name (defaults to primary `Gemini 4 Argon (Medium)`)
+  - `primaryModel`: Primary flagship model (`Gemini 4 Argon (Medium)`)
+  - `isPrimaryModelActive`: Boolean indicating whether a Gemini 4 model is currently active
+  - `quotas`: Usage percentages and reset timestamps prioritized with `Gemini 4 Argon` first, followed by standard Gemini & Claude/GPT models
   - `credits`: Remaining credits and upgrade URL
   - `token`: Authentication method and token expiration

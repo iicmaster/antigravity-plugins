@@ -5,7 +5,13 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { parseSkillFrontmatter, validateAgentPlugin } from "../plugins/agy/scripts/lib/agent-plugin-validator.mjs";
+import {
+  parseSkillFrontmatter,
+  validateAgentPlugin,
+  validateAllAgentPlugins,
+  AGENT_PLUGIN_SCHEMA_URL,
+  AGENT_PLUGIN_MCP_SCHEMA_URL
+} from "../plugins/agy/scripts/lib/agent-plugin-validator.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SAMPLE_PLUGIN_DIR = path.join(ROOT, "plugins", "sample-agent-plugin");
@@ -22,6 +28,7 @@ test("validates canonical reference sample Agent Plugin package successfully", (
 
   // Verify details structure
   assert.equal(result.details.plugin.name, "sample-agent-plugin");
+  assert.equal(result.details.plugin.$schema, AGENT_PLUGIN_SCHEMA_URL);
   assert.equal(result.details.plugin.version, "1.0.0");
   assert.equal(result.details.plugin.skills, "./skills/");
   assert.equal(result.details.plugin.mcpServers, "./mcp.json");
@@ -99,10 +106,89 @@ test("detects missing or invalid plugin.json", () => {
   );
   const res3 = validateAgentPlugin(tmpDir);
   assert.equal(res3.valid, false);
+  assert.ok(res3.errors.some((e) => e.includes("'$schema' field is required")));
   assert.ok(res3.errors.some((e) => e.includes("invalid characters")));
   assert.ok(res3.errors.some((e) => e.includes("valid semver")));
   assert.ok(res3.errors.some((e) => e.includes("'description' field is required")));
   assert.ok(res3.errors.some((e) => e.includes("'skills' field is required")));
+});
+
+test("enforces agent-plugins.org 1.0.0 $schema in plugin.json and mcp.json", () => {
+  const tmpDir = createTempDir();
+  fs.mkdirSync(path.join(tmpDir, "skills", "s1"), { recursive: true });
+  fs.writeFileSync(
+    path.join(tmpDir, "skills", "s1", "SKILL.md"),
+    `---\nname: s1\ndescription: Skill 1\n---\nBody`,
+    "utf8"
+  );
+
+  // Missing $schema in plugin.json
+  fs.writeFileSync(
+    path.join(tmpDir, "plugin.json"),
+    JSON.stringify({
+      name: "valid-name",
+      version: "1.0.0",
+      description: "Valid description",
+      skills: "./skills/",
+      mcpServers: "./mcp.json"
+    }),
+    "utf8"
+  );
+  fs.writeFileSync(
+    path.join(tmpDir, "mcp.json"),
+    JSON.stringify({
+      $schema: AGENT_PLUGIN_MCP_SCHEMA_URL,
+      mcpServers: { s: { command: "node" } }
+    }),
+    "utf8"
+  );
+
+  const res1 = validateAgentPlugin(tmpDir);
+  assert.equal(res1.valid, false);
+  assert.ok(res1.errors.some((e) => e.includes("'$schema' field is required")));
+
+  // Invalid $schema URL
+  fs.writeFileSync(
+    path.join(tmpDir, "plugin.json"),
+    JSON.stringify({
+      $schema: "https://unknown.org/schema.json",
+      name: "valid-name",
+      version: "1.0.0",
+      description: "Valid description",
+      skills: "./skills/",
+      mcpServers: "./mcp.json"
+    }),
+    "utf8"
+  );
+
+  const res2 = validateAgentPlugin(tmpDir);
+  assert.equal(res2.valid, false);
+  assert.ok(res2.errors.some((e) => e.includes("must start with https://agent-plugins.org/schemas/")));
+
+  // Missing $schema in mcp.json
+  fs.writeFileSync(
+    path.join(tmpDir, "plugin.json"),
+    JSON.stringify({
+      $schema: AGENT_PLUGIN_SCHEMA_URL,
+      name: "valid-name",
+      version: "1.0.0",
+      description: "Valid description",
+      skills: "./skills/",
+      mcpServers: "./mcp.json"
+    }),
+    "utf8"
+  );
+  fs.writeFileSync(
+    path.join(tmpDir, "mcp.json"),
+    JSON.stringify({
+      mcpServers: { s: { command: "node" } }
+    }),
+    "utf8"
+  );
+
+  const res3 = validateAgentPlugin(tmpDir);
+  assert.equal(res3.valid, false);
+  assert.ok(res3.errors.some((e) => e.includes("'$schema' field is required")));
 });
 
 test("detects non-existent skills directory and MCP config file", () => {
@@ -110,6 +196,7 @@ test("detects non-existent skills directory and MCP config file", () => {
   fs.writeFileSync(
     path.join(tmpDir, "plugin.json"),
     JSON.stringify({
+      $schema: AGENT_PLUGIN_SCHEMA_URL,
       name: "test-plugin",
       version: "1.0.0",
       description: "Test plugin",
@@ -132,11 +219,16 @@ test("detects missing SKILL.md and missing frontmatter fields", () => {
   fs.mkdirSync(path.join(skillsDir, "empty-skill"), { recursive: true });
 
   const mcpPath = path.join(tmpDir, "mcp.json");
-  fs.writeFileSync(mcpPath, JSON.stringify({ mcpServers: {} }), "utf8");
+  fs.writeFileSync(
+    mcpPath,
+    JSON.stringify({ $schema: AGENT_PLUGIN_MCP_SCHEMA_URL, mcpServers: {} }),
+    "utf8"
+  );
 
   fs.writeFileSync(
     path.join(tmpDir, "plugin.json"),
     JSON.stringify({
+      $schema: AGENT_PLUGIN_SCHEMA_URL,
       name: "test-plugin",
       version: "1.0.0",
       description: "Test plugin",
@@ -176,6 +268,7 @@ test("validates MCP transport formats (stdio, streamable HTTP, SSE)", () => {
   fs.writeFileSync(
     path.join(tmpDir, "mcp.json"),
     JSON.stringify({
+      $schema: AGENT_PLUGIN_MCP_SCHEMA_URL,
       mcpServers: {
         badStdio: { type: "stdio" }, // missing command
         badHttp: { type: "streamable-http", url: "not-a-url" },
@@ -189,6 +282,7 @@ test("validates MCP transport formats (stdio, streamable HTTP, SSE)", () => {
   fs.writeFileSync(
     path.join(tmpDir, "plugin.json"),
     JSON.stringify({
+      $schema: AGENT_PLUGIN_SCHEMA_URL,
       name: "test-plugin",
       version: "1.0.0",
       description: "Test plugin",
@@ -218,6 +312,7 @@ test("validates reverse-domain client extension folders", () => {
   fs.writeFileSync(
     path.join(tmpDir, "mcp.json"),
     JSON.stringify({
+      $schema: AGENT_PLUGIN_MCP_SCHEMA_URL,
       mcpServers: {
         validStdio: { command: "node", args: ["server.js"] }
       }
@@ -228,6 +323,7 @@ test("validates reverse-domain client extension folders", () => {
   fs.writeFileSync(
     path.join(tmpDir, "plugin.json"),
     JSON.stringify({
+      $schema: AGENT_PLUGIN_SCHEMA_URL,
       name: "test-plugin",
       version: "1.0.0",
       description: "Test plugin",
@@ -259,4 +355,15 @@ test("validates reverse-domain client extension folders", () => {
   assert.equal(res3.valid, true);
   assert.equal(res3.details.clientExtensions.length, 1);
   assert.equal(res3.details.clientExtensions[0].name, "org.example.client");
+});
+
+test("validateAllAgentPlugins validates all plugins in workspace", () => {
+  const pluginsDir = path.join(ROOT, "plugins");
+  const result = validateAllAgentPlugins(pluginsDir);
+
+  assert.equal(result.valid, true);
+  assert.ok(result.plugins.length >= 3);
+  assert.ok(result.plugins.some((p) => p.name === "agy" && p.valid));
+  assert.ok(result.plugins.some((p) => p.name === "quota-dashboard" && p.valid));
+  assert.ok(result.plugins.some((p) => p.name === "sample-agent-plugin" && p.valid));
 });
