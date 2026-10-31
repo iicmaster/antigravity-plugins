@@ -539,7 +539,8 @@
         </div>
 
         <div class="threshold-section">
-          <h3>Thresholds & Timing</h3>
+          <h3>Thresholds</h3>
+          <p class="threshold-hint">Each level notifies once per quota cycle, then stays silent until the quota resets.</p>
           <div class="threshold-grid">
             <div class="input-field">
               <label for="warningThresholdInput">Warning Threshold</label>
@@ -554,14 +555,6 @@
               <div class="input-unit">
                 <input type="number" id="criticalThresholdInput" min="1" max="25" value="15">
                 <span>%</span>
-              </div>
-            </div>
-
-            <div class="input-field">
-              <label for="cooldownInput">Alert Cooldown</label>
-              <div class="input-unit">
-                <input type="number" id="cooldownInput" min="1" max="120" value="15">
-                <span>mins</span>
               </div>
             </div>
           </div>

@@ -1210,9 +1210,15 @@ body {
   margin-bottom: 0.75rem;
 }
 
+.threshold-hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin: -0.5rem 0 0.75rem;
+}
+
 .threshold-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
 }
 

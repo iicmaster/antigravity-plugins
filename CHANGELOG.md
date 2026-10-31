@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.5.1 - 2026-10-31
+
+### Fixed
+
+- **Quota Dashboard Alerts Fire Once Per Quota Cycle**:
+  - Low/exhausted quota no longer re-fires the same notification every cooldown interval — each alert level (warning, critical) notifies at most once per quota cycle and stays silent until the quota genuinely resets.
+  - Alert state is now persisted to `~/.gemini/antigravity-cli/quota-alert-state.json`, so restarting the dashboard server mid-cycle no longer repeats notifications the user already received.
+  - Removed the obsolete "Alert Cooldown" setting from the notification settings modal and server defaults; the modal now documents the once-per-cycle behavior.
+  - Added regression tests covering no-repeat alert behavior, restart persistence, cycle reset re-arming, and removal of the cooldown setting.
+
 ## 0.5.0 - 2026-10-17
 
 ### Added

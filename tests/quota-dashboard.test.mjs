@@ -39,6 +39,30 @@ test("quota dashboard server supports process.env.PORT, account extraction, and 
   assert.match(serverCode, /sendOsNotification/);
 });
 
+test("quota dashboard alerts fire once per quota cycle without cooldown repeats", () => {
+  const serverCode = readText("server.js");
+
+  // No periodic re-fire: the cooldown re-arm path must be gone entirely.
+  assert.doesNotMatch(serverCode, /isCooldownElapsed/);
+  assert.doesNotMatch(serverCode, /cooldownMinutes/);
+
+  // Each level alerts at most once per cycle, re-armed only by a genuine refill.
+  assert.match(serverCode, /tracker\.levels\.includes\(currentLevel\)/);
+  assert.match(serverCode, /isCycleReset/);
+
+  // Alert state survives server restarts so a restart mid-cycle stays silent.
+  assert.match(serverCode, /quota-alert-state\.json/);
+  assert.match(serverCode, /loadAlertState/);
+  assert.match(serverCode, /saveAlertState/);
+
+  const html = readText("public/index.html");
+  assert.doesNotMatch(html, /cooldownInput/);
+
+  const js = readText("public/app.js");
+  assert.doesNotMatch(js, /cooldownInput/);
+  assert.doesNotMatch(js, /cooldownMinutes/);
+});
+
 test("quota dashboard UI includes account cards, notification controls, toast container, and settings modal", () => {
   const html = readText("public/index.html");
   assert.match(html, /rel="icon"/, "index.html should have favicon link");

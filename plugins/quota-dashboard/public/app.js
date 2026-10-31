@@ -50,7 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const notifResetToggle = document.getElementById('notifResetToggle');
   const warningThresholdInput = document.getElementById('warningThresholdInput');
   const criticalThresholdInput = document.getElementById('criticalThresholdInput');
-  const cooldownInput = document.getElementById('cooldownInput');
 
   let autoRefreshInterval = null;
   let countdownTimers = {};
@@ -63,7 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
     osNativeEnabled: true,
     warningThreshold: 30,
     criticalThreshold: 15,
-    cooldownMinutes: 15,
     notifyOnReset: true
   };
 
@@ -277,7 +275,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (notifResetToggle) notifResetToggle.checked = !!settings.notifyOnReset;
     if (warningThresholdInput) warningThresholdInput.value = settings.warningThreshold ?? 30;
     if (criticalThresholdInput) criticalThresholdInput.value = settings.criticalThreshold ?? 15;
-    if (cooldownInput) cooldownInput.value = settings.cooldownMinutes ?? 15;
   }
 
   async function saveSettingsFromModal() {
@@ -288,8 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
       osNativeEnabled: notifOsToggle.checked,
       notifyOnReset: notifResetToggle.checked,
       warningThreshold: parseInt(warningThresholdInput.value, 10) || 30,
-      criticalThreshold: parseInt(criticalThresholdInput.value, 10) || 15,
-      cooldownMinutes: parseInt(cooldownInput.value, 10) || 15
+      criticalThreshold: parseInt(criticalThresholdInput.value, 10) || 15
     };
 
     try {

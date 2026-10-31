@@ -14,9 +14,9 @@ const PLUGIN_VERSION = (() => {
   try {
     return JSON.parse(
       fs.readFileSync(path.join(__dirname, 'plugin.json'), 'utf8')
-    ).version || '0.5.0';
+    ).version || '0.5.1';
   } catch {
-    return '0.5.0';
+    return '0.5.1';
   }
 })();
 
@@ -268,6 +268,7 @@ function getTokenInfo() {
 }
 
 const NOTIFICATION_SETTINGS_PATH = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'quota-notifications.json');
+const ALERT_STATE_PATH = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'quota-alert-state.json');
 
 const defaultNotificationSettings = {
   enabled: true,
@@ -276,7 +277,6 @@ const defaultNotificationSettings = {
   osNativeEnabled: true,
   warningThreshold: 30,
   criticalThreshold: 15,
-  cooldownMinutes: 15,
   notifyOnReset: true
 };
 
@@ -307,15 +307,48 @@ function saveNotificationSettings(settings) {
   }
 }
 
-// In-memory alert state tracker for transition detection & cooldown
-const alertStateTracker = {
-  gemini4Weekly: { level: 'normal', lastAlertTime: 0, lastPercentage: 100 },
-  gemini45h: { level: 'normal', lastAlertTime: 0, lastPercentage: 100 },
-  geminiWeekly: { level: 'normal', lastAlertTime: 0, lastPercentage: 100 },
-  gemini5h: { level: 'normal', lastAlertTime: 0, lastPercentage: 100 },
-  claudeWeekly: { level: 'normal', lastAlertTime: 0, lastPercentage: 100 },
-  claude5h: { level: 'normal', lastAlertTime: 0, lastPercentage: 100 }
-};
+// Alert state per quota window. Persisted to disk so a server restart within
+// the same quota cycle never re-fires a notification the user already got.
+const ALERT_KEYS = ['gemini4Weekly', 'gemini45h', 'geminiWeekly', 'gemini5h', 'claudeWeekly', 'claude5h'];
+const VALID_ALERT_LEVELS = ['warning', 'critical'];
+
+function loadAlertState() {
+  const tracker = {};
+  for (const key of ALERT_KEYS) {
+    tracker[key] = { levels: [], lastPercentage: 100 };
+  }
+  try {
+    if (fs.existsSync(ALERT_STATE_PATH)) {
+      const saved = JSON.parse(fs.readFileSync(ALERT_STATE_PATH, 'utf8'));
+      for (const key of ALERT_KEYS) {
+        if (!saved[key]) continue;
+        tracker[key] = {
+          levels: Array.isArray(saved[key].levels)
+            ? saved[key].levels.filter(level => VALID_ALERT_LEVELS.includes(level))
+            : [],
+          lastPercentage: typeof saved[key].lastPercentage === 'number' ? saved[key].lastPercentage : 100
+        };
+      }
+    }
+  } catch (e) {
+    console.error('Error reading alert state:', e);
+  }
+  return tracker;
+}
+
+function saveAlertState() {
+  try {
+    const dir = path.dirname(ALERT_STATE_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(ALERT_STATE_PATH, JSON.stringify(alertStateTracker, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Error saving alert state:', e);
+  }
+}
+
+const alertStateTracker = loadAlertState();
 
 function sendOsNotification(title, message, soundName = 'Ping') {
   if (process.platform !== 'darwin') return;
@@ -333,8 +366,7 @@ function evaluateQuotaAlerts(quotas, settings) {
   if (!settings.enabled) return [];
 
   const alerts = [];
-  const now = Date.now();
-  const cooldownMs = (settings.cooldownMinutes || 15) * 60 * 1000;
+  let stateChanged = false;
 
   for (const q of quotas) {
     let key = '';
@@ -355,58 +387,57 @@ function evaluateQuotaAlerts(quotas, settings) {
     if (!key) continue;
 
     const percent = q.percentage;
-    const tracker = alertStateTracker[key] || { level: 'normal', lastAlertTime: 0, lastPercentage: percent };
-    const prevLevel = tracker.level;
+    const tracker = alertStateTracker[key] || { levels: [], lastPercentage: percent };
     let currentLevel = 'normal';
 
     if (percent <= settings.criticalThreshold) {
       currentLevel = 'critical';
     } else if (percent <= settings.warningThreshold) {
       currentLevel = 'warning';
-    } else {
-      currentLevel = 'normal';
     }
 
-    const isTransition = currentLevel !== prevLevel;
-    const isCooldownElapsed = now - tracker.lastAlertTime >= cooldownMs;
-    const isReset = prevLevel !== 'normal' && currentLevel === 'normal' && percent > tracker.lastPercentage;
+    // A genuine refill (>= 10pp jump back to normal) starts a new quota cycle
+    // and re-arms alerts for it.
+    const isCycleReset = tracker.levels.length > 0
+      && currentLevel === 'normal'
+      && percent >= tracker.lastPercentage + 10;
 
-    let alertEvent = null;
-
-    if (isReset && settings.notifyOnReset) {
-      alertEvent = {
-        key,
-        type: 'reset',
-        level: 'success',
-        title: `โควตา ${categoryLabel} รีเซ็ตเต็มแล้ว`,
-        message: `${limitLabel} ฟื้นฟูเป็น ${percent}% พร้อมใช้งานต่อ`,
-        timestamp: new Date().toISOString()
-      };
-    } else if ((isTransition || isCooldownElapsed) && currentLevel !== 'normal') {
-      if (currentLevel === 'critical') {
-        alertEvent = {
+    if (isCycleReset) {
+      tracker.levels = [];
+      if (settings.notifyOnReset) {
+        alerts.push({
           key,
-          type: 'critical',
-          level: 'critical',
-          title: `⚠️ โควตาวิกฤต: ${categoryLabel}`,
-          message: `${limitLabel} เหลือเพียง ${percent}% (รีเซ็ตใน ${q.resetAt || 'เร็วๆ นี้'})`,
+          type: 'reset',
+          level: 'success',
+          title: `โควตา ${categoryLabel} รีเซ็ตเต็มแล้ว`,
+          message: `${limitLabel} ฟื้นฟูเป็น ${percent}% พร้อมใช้งานต่อ`,
           timestamp: new Date().toISOString()
-        };
-      } else if (currentLevel === 'warning') {
-        alertEvent = {
-          key,
-          type: 'warning',
-          level: 'warning',
-          title: `โควตาใกล้หมด: ${categoryLabel}`,
-          message: `${limitLabel} เหลือ ${percent}% (รีเซ็ตใน ${q.resetAt || 'เร็วๆ นี้'})`,
-          timestamp: new Date().toISOString()
-        };
+        });
+        stateChanged = true;
       }
     }
 
-    if (alertEvent) {
-      tracker.lastAlertTime = now;
+    // Notify each level at most once per quota cycle: the first crossing of a
+    // threshold fires one alert and then stays silent until the cycle resets.
+    if (currentLevel !== 'normal' && !tracker.levels.includes(currentLevel)) {
+      tracker.levels.push(currentLevel);
+      const alertEvent = currentLevel === 'critical' ? {
+        key,
+        type: 'critical',
+        level: 'critical',
+        title: `⚠️ โควตาวิกฤต: ${categoryLabel}`,
+        message: `${limitLabel} เหลือเพียง ${percent}% (รีเซ็ตใน ${q.resetAt || 'เร็วๆ นี้'})`,
+        timestamp: new Date().toISOString()
+      } : {
+        key,
+        type: 'warning',
+        level: 'warning',
+        title: `โควตาใกล้หมด: ${categoryLabel}`,
+        message: `${limitLabel} เหลือ ${percent}% (รีเซ็ตใน ${q.resetAt || 'เร็วๆ นี้'})`,
+        timestamp: new Date().toISOString()
+      };
       alerts.push(alertEvent);
+      stateChanged = true;
 
       if (settings.osNativeEnabled) {
         const sound = currentLevel === 'critical' ? 'Basso' : 'Ping';
@@ -414,11 +445,11 @@ function evaluateQuotaAlerts(quotas, settings) {
       }
     }
 
-    tracker.level = currentLevel;
     tracker.lastPercentage = percent;
     alertStateTracker[key] = tracker;
   }
 
+  if (stateChanged) saveAlertState();
   return alerts;
 }
 

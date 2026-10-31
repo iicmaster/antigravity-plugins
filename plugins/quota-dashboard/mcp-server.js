@@ -13,9 +13,9 @@ const PLUGIN_VERSION = (() => {
   try {
     return JSON.parse(
       fs.readFileSync(path.join(__dirname, 'plugin.json'), 'utf8')
-    ).version || '0.5.0';
+    ).version || '0.5.1';
   } catch {
-    return '0.5.0';
+    return '0.5.1';
   }
 })();
 
