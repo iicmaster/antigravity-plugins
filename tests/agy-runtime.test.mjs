@@ -7,14 +7,17 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  DEFAULT_AGY_MODEL,
   analyzeAgyHelpResult,
   buildAgyArgv,
   createJob,
   discoverAgentPlugins,
   goDurationToMilliseconds,
   isAgentPlugin,
+  normalizeEffort,
   normalizeRunOptions,
   readAgentPlugin,
+  resolveAgyModel,
   runJobFile,
   resolveStateDir,
   validateAgentPluginManifest,
@@ -602,4 +605,94 @@ test("isAgentPlugin correctly identifies compliant plugin directories", () => {
   assert.equal(isAgentPlugin(path.join(ROOT, "plugins", "agy")), true);
   assert.equal(isAgentPlugin(path.join(ROOT, "plugins", "quota-dashboard")), true);
   assert.equal(isAgentPlugin(ROOT), false);
+});
+
+test("resolveAgyModel and normalizeEffort support Gemini 4 family aliases and reject invalid inputs", () => {
+  assert.equal(DEFAULT_AGY_MODEL, "gemini-4-hydrogen-medium");
+  assert.equal(resolveAgyModel("hydrogen"), "gemini-4-hydrogen-medium");
+  assert.equal(resolveAgyModel("gemini-4-hydrogen"), "gemini-4-hydrogen-medium");
+  assert.equal(resolveAgyModel("hydrogen-low"), "gemini-4-hydrogen-low");
+  assert.equal(resolveAgyModel("hydrogen-medium"), "gemini-4-hydrogen-medium");
+  assert.equal(resolveAgyModel("hydrogen-high"), "gemini-4-hydrogen-high");
+  assert.equal(resolveAgyModel("hydrogen-xhigh"), "gemini-4-hydrogen-xhigh");
+  assert.equal(resolveAgyModel("carbon"), "gemini-4-carbon-medium");
+  assert.equal(resolveAgyModel("gemini-4-carbon"), "gemini-4-carbon-medium");
+  assert.equal(resolveAgyModel("carbon-low"), "gemini-4-carbon-low");
+  assert.equal(resolveAgyModel("carbon-medium"), "gemini-4-carbon-medium");
+  assert.equal(resolveAgyModel("carbon-high"), "gemini-4-carbon-high");
+  assert.equal(resolveAgyModel("argon"), "gemini-4-argon-medium");
+  assert.equal(resolveAgyModel("gemini-4-argon"), "gemini-4-argon-medium");
+  assert.equal(resolveAgyModel("argon-low"), "gemini-4-argon-low");
+  assert.equal(resolveAgyModel("argon-medium"), "gemini-4-argon-medium");
+  assert.equal(resolveAgyModel("argon-high"), "gemini-4-argon-high");
+  assert.equal(resolveAgyModel("orchestrator"), "gemini-pro-orchestrator");
+  assert.equal(resolveAgyModel("orchestrator-carbon"), "gemini-pro-orchestrator");
+  assert.equal(resolveAgyModel("orchestrator-argon"), "gemini-pro-orchestrator-argon");
+  assert.equal(resolveAgyModel("flash"), "gemini-3.8-flash-high");
+
+  assert.throws(() => resolveAgyModel("--bad"), /unsupported characters/i);
+  assert.throws(() => resolveAgyModel("bad model!"), /unsupported characters/i);
+  assert.equal(normalizeEffort("XHigh"), "xhigh");
+  assert.throws(() => normalizeEffort("ultra"), /effort/i);
+});
+
+test("buildAgyArgv appends validated --model and --effort flags for Gemini 4 family runs", () => {
+  const argv = buildAgyArgv({
+    prompt: "review",
+    model: "hydrogen-xhigh",
+    effort: "xhigh",
+    sandbox: true
+  });
+
+  assert.deepEqual(argv, [
+    "--print-timeout",
+    "10m0s",
+    "--sandbox",
+    "--model",
+    "gemini-4-hydrogen-xhigh",
+    "--effort",
+    "xhigh"
+  ]);
+});
+
+test("companion CLI forwards Carbon, Argon, and Hydrogen --model and --effort without --print", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-gemini4-cli-"));
+  const binDir = path.join(cwd, "bin");
+  writeFakeAgy(
+    binDir,
+    `#!/usr/bin/env node
+if (process.argv.includes("--help")) {
+  console.log("--print --print-timeout --sandbox --add-dir --continue --conversation");
+  process.exit(0);
+}
+process.stdin.resume();
+process.stdin.on("end", () => {
+  console.log(JSON.stringify({ argv: process.argv.slice(2) }));
+});
+`
+  );
+
+  const env = fakeAgyEnv(cwd, binDir);
+  const cases = [
+    { model: "carbon", effort: "high", expectedModel: "gemini-4-carbon-medium", expectedEffort: "high" },
+    { model: "argon", effort: "medium", expectedModel: "gemini-4-argon-medium", expectedEffort: "medium" },
+    { model: "hydrogen", effort: "xhigh", expectedModel: "gemini-4-hydrogen-medium", expectedEffort: "xhigh" }
+  ];
+
+  for (const entry of cases) {
+    const result = spawnSync(
+      process.execPath,
+      [COMPANION, "rescue", "--model", entry.model, "--effort", entry.effort, "--timeout", "5s", "--", "inspect"],
+      { cwd, env, encoding: "utf8" }
+    );
+    assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+    const parsed = JSON.parse(result.stdout.match(/\{"argv":.*\}/)[0]).argv;
+    assert.ok(!parsed.includes("--print"), "companion must rely on implicit stdin print mode");
+    const modelIdx = parsed.indexOf("--model");
+    assert.notEqual(modelIdx, -1);
+    assert.equal(parsed[modelIdx + 1], entry.expectedModel);
+    const effortIdx = parsed.indexOf("--effort");
+    assert.notEqual(effortIdx, -1);
+    assert.equal(parsed[effortIdx + 1], entry.expectedEffort);
+  }
 });

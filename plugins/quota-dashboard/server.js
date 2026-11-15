@@ -14,9 +14,9 @@ const PLUGIN_VERSION = (() => {
   try {
     return JSON.parse(
       fs.readFileSync(path.join(__dirname, 'plugin.json'), 'utf8')
-    ).version || '0.5.1';
+    ).version || '0.6.0';
   } catch {
-    return '0.5.1';
+    return '0.6.0';
   }
 })();
 
@@ -32,15 +32,116 @@ function runCommand(cmd) {
   });
 }
 
-const DEFAULT_PRIMARY_MODEL = 'Gemini 4 Argon (Medium)';
+const DEFAULT_PRIMARY_MODEL = 'Gemini 4 Hydrogen (Medium)';
+const DEFAULT_PRIMARY_MODEL_ID = 'gemini-4-hydrogen-medium';
+
+const GEMINI4_FAMILY_MODELS = [
+  {
+    key: 'hydrogen',
+    name: 'Gemini 4 Hydrogen',
+    badge: 'Default',
+    defaultId: 'gemini-4-hydrogen-medium',
+    lowId: 'gemini-4-hydrogen-low',
+    efforts: ['Low', 'Medium', 'High', 'XHigh'],
+    models: [
+      'gemini-4-hydrogen-low',
+      'gemini-4-hydrogen-medium',
+      'gemini-4-hydrogen-high',
+      'gemini-4-hydrogen-xhigh'
+    ]
+  },
+  {
+    key: 'carbon',
+    name: 'Gemini 4 Carbon',
+    badge: 'Reasoning',
+    defaultId: 'gemini-4-carbon-medium',
+    lowId: 'gemini-4-carbon-low',
+    efforts: ['Low', 'Medium', 'High'],
+    models: [
+      'gemini-4-carbon-low',
+      'gemini-4-carbon-medium',
+      'gemini-4-carbon-high'
+    ]
+  },
+  {
+    key: 'argon',
+    name: 'Gemini 4 Argon',
+    badge: 'Frontier',
+    defaultId: 'gemini-4-argon-medium',
+    lowId: 'gemini-4-argon-low',
+    efforts: ['Low', 'Medium', 'High'],
+    models: [
+      'gemini-4-argon-low',
+      'gemini-4-argon-medium',
+      'gemini-4-argon-high'
+    ]
+  },
+  {
+    key: 'orchestrator',
+    name: 'Orchestrator',
+    badge: 'Multi-Agent',
+    defaultId: 'gemini-pro-orchestrator',
+    lowId: 'gemini-4-hydrogen-low',
+    efforts: ['Carbon', 'Argon'],
+    models: [
+      'gemini-pro-orchestrator',
+      'gemini-pro-orchestrator-argon'
+    ]
+  }
+];
+
+const MODEL_ID_TO_LABEL = {
+  'gemini-4-hydrogen-low': 'Gemini 4 Hydrogen (Low)',
+  'gemini-4-hydrogen-medium': 'Gemini 4 Hydrogen (Medium)',
+  'gemini-4-hydrogen-high': 'Gemini 4 Hydrogen (High)',
+  'gemini-4-hydrogen-xhigh': 'Gemini 4 Hydrogen (XHigh)',
+  'gemini-4-carbon-low': 'Gemini 4 Carbon (Low)',
+  'gemini-4-carbon-medium': 'Gemini 4 Carbon (Medium)',
+  'gemini-4-carbon-high': 'Gemini 4 Carbon (High)',
+  'gemini-4-argon-low': 'Gemini 4 Argon (Low)',
+  'gemini-4-argon-medium': 'Gemini 4 Argon (Medium)',
+  'gemini-4-argon-high': 'Gemini 4 Argon (High)',
+  'gemini-pro-orchestrator': 'Orchestrator (Carbon)',
+  'gemini-pro-orchestrator-argon': 'Orchestrator (Argon)',
+  'gemini-3.8-flash-low': 'Gemini 3.8 Flash (Low)',
+  'gemini-3.8-flash-medium': 'Gemini 3.8 Flash (Medium)',
+  'gemini-3.8-flash-high': 'Gemini 3.8 Flash (High)',
+  'claude-opus-5-5-low': 'Claude Opus 5.5 (Low)',
+  'claude-opus-5-5-medium': 'Claude Opus 5.5 (Medium)',
+  'claude-opus-5-5-high': 'Claude Opus 5.5 (High)',
+  'claude-sonnet-5-5-low': 'Claude Sonnet 5.5 (Low)',
+  'claude-sonnet-5-5-medium': 'Claude Sonnet 5.5 (Medium)',
+  'claude-sonnet-5-5-high': 'Claude Sonnet 5.5 (High)',
+  'gpt-oss-120b-medium': 'GPT-OSS 120B (Medium)'
+};
+
+function formatModelDisplayName(rawModel = '') {
+  const trimmed = String(rawModel || '').trim();
+  if (!trimmed) return DEFAULT_PRIMARY_MODEL;
+  return MODEL_ID_TO_LABEL[trimmed.toLowerCase()] || trimmed;
+}
 
 function isGemini4Category(category = '') {
   return /^Gemini 4\b/i.test(String(category).trim());
 }
 
+function isGemini4Model(model = '') {
+  const value = String(model).trim();
+  return /^(?:Gemini 4\b|gemini-4-|Orchestrator(?:\s*\((?:Carbon|Argon)\))?$|gemini-pro-orchestrator(?:-argon)?$)/i.test(value);
+}
+
+function detectGemini4Subfamily(model = '') {
+  const value = String(model).trim();
+  if (/^(?:Orchestrator|gemini-pro-orchestrator)/i.test(value)) return 'orchestrator';
+  if (/\bhydrogen\b|gemini-4-hydrogen/i.test(value)) return 'hydrogen';
+  if (/\bcarbon\b|gemini-4-carbon/i.test(value)) return 'carbon';
+  if (/\bargon\b|gemini-4-argon/i.test(value)) return 'argon';
+  return null;
+}
+
 function parseUsageOutput(rawText) {
   const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-  const results = [];
+  const parsed = [];
 
   for (const line of lines) {
     const parts = line.split('\t').map(p => p.trim());
@@ -51,17 +152,28 @@ function parseUsageOutput(rawText) {
       const percentage = parseInt(percentStr, 10);
       const resetAt = parts[3] || null;
 
-      results.push({
+      parsed.push({
         category,
         limitType,
         percentage: isNaN(percentage) ? 0 : percentage,
-        resetAt,
-        isPrimary: isGemini4Category(category)
+        resetAt
       });
     }
   }
 
-  // Promote Gemini 4 (primary flagship model) to the front of the quota list
+  const hasDedicatedGemini4 = parsed.some(r => isGemini4Category(r.category));
+  const results = parsed.map(r => {
+    const isDedicatedGemini4 = isGemini4Category(r.category);
+    const isSharedGeminiPool = !hasDedicatedGemini4 && r.category === 'Gemini Models';
+    return {
+      ...r,
+      isDedicatedGemini4,
+      isSharedGeminiPool,
+      isPrimary: hasDedicatedGemini4 ? isDedicatedGemini4 : isSharedGeminiPool
+    };
+  });
+
+  // Promote Gemini 4 (primary flagship family) to the front of the quota list
   results.sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
   return results;
 }
@@ -530,7 +642,7 @@ const server = http.createServer(async (req, res) => {
       const notifSettings = getNotificationSettings();
       const alerts = evaluateQuotaAlerts(quotas, notifSettings);
 
-      const activeModel = settings.model || DEFAULT_PRIMARY_MODEL;
+      const activeModel = formatModelDisplayName(settings.model || DEFAULT_PRIMARY_MODEL);
 
       const payload = {
         success: true,
@@ -538,7 +650,10 @@ const server = http.createServer(async (req, res) => {
         timestamp: new Date().toISOString(),
         activeModel,
         primaryModel: DEFAULT_PRIMARY_MODEL,
-        isPrimaryModelActive: isGemini4Category(activeModel),
+        primaryModelId: DEFAULT_PRIMARY_MODEL_ID,
+        activeSubfamily: detectGemini4Subfamily(activeModel),
+        isPrimaryModelActive: isGemini4Model(activeModel),
+        gemini4Family: GEMINI4_FAMILY_MODELS,
         runningSpeed: settings.runningLightSpeed || 'fast',
         account,
         quotas,

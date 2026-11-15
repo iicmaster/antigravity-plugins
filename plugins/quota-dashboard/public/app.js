@@ -21,11 +21,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Primary Gemini 4 elements
   const gemini4GroupEl = document.getElementById('gemini4Group');
   const gemini4GroupTitleEl = document.getElementById('gemini4GroupTitle');
+  const gemini4GroupDescEl = document.getElementById('gemini4GroupDesc');
   const gemini4ActiveBadgeEl = document.getElementById('gemini4ActiveBadge');
   const copySwitchGemini4Btn = document.getElementById('copySwitchGemini4Btn');
+  const gemini4FamilyBarEl = document.getElementById('gemini4FamilyBar');
   const gemini4MetersContainerEl = document.getElementById('gemini4MetersContainer');
   const gemini4WeeklyTitleEl = document.getElementById('gemini4WeeklyTitle');
+  const gemini4WeeklySubtitleEl = document.getElementById('gemini4WeeklySubtitle');
   const meterGemini45hEl = document.getElementById('meter-gemini4-5h');
+  const geminiGroupEl = document.getElementById('geminiGroup');
+  const claudeGptGroupEl = document.getElementById('claudeGptGroup');
+  const claudeMetersContainerEl = document.getElementById('claudeMetersContainer');
 
   // Drawer elements
   const toggleJsonBtn = document.getElementById('toggleJsonBtn');
@@ -54,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let autoRefreshInterval = null;
   let countdownTimers = {};
   let currentRawData = null;
+  let activeSubfamily = 'hydrogen';
   let audioCtx = null;
   let notificationSettings = {
     enabled: true,
@@ -388,6 +395,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function isGemini4ModelName(modelName = '') {
+    const value = String(modelName).trim();
+    return /^(?:Gemini 4\b|gemini-4-|Orchestrator(?:\s*\((?:Carbon|Argon)\))?$|gemini-pro-orchestrator(?:-argon)?$)/i.test(value);
+  }
+
+  function detectGemini4Subfamily(modelName = '') {
+    const value = String(modelName).trim();
+    if (/^(?:Orchestrator|gemini-pro-orchestrator)/i.test(value)) return 'orchestrator';
+    if (/\bhydrogen\b|gemini-4-hydrogen/i.test(value)) return 'hydrogen';
+    if (/\bcarbon\b|gemini-4-carbon/i.test(value)) return 'carbon';
+    if (/\bargon\b|gemini-4-argon/i.test(value)) return 'argon';
+    return null;
+  }
+
+  function syncFamilyBar(subfamily) {
+    if (!gemini4FamilyBarEl) return;
+    const pills = gemini4FamilyBarEl.querySelectorAll('.family-pill');
+    pills.forEach((pill) => {
+      const isActive = Boolean(subfamily) && pill.dataset.subfamily === subfamily;
+      pill.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+  }
+
   function updateUI(data) {
     // 1. Account Details
     const email = data.account?.email || '';
@@ -427,8 +457,10 @@ document.addEventListener('DOMContentLoaded', () => {
       pluginVersionEl.title = `Plugin Version ${data.version}`;
     }
 
-    const modelName = data.activeModel || 'Gemini 4 Argon (Medium)';
-    const isPrimaryActive = /^Gemini 4\b/i.test(modelName) || Boolean(data.isPrimaryModelActive);
+    const modelName = data.activeModel || 'Gemini 4 Hydrogen (Medium)';
+    const isPrimaryActive = isGemini4ModelName(modelName) || Boolean(data.isPrimaryModelActive);
+    activeSubfamily = data.activeSubfamily ?? detectGemini4Subfamily(modelName);
+    syncFamilyBar(activeSubfamily);
 
     if (activeModelEl) {
       activeModelEl.textContent = modelName;
@@ -475,13 +507,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 4. Process Quotas & Render Meters
     const quotas = data.quotas || [];
+    const hasDedicatedGemini4 = quotas.some(q => /^Gemini 4\b/i.test(q.category));
+    const hasGeminiModels = quotas.some(q => q.category === 'Gemini Models');
+    const useSharedGeminiPool = !hasDedicatedGemini4 && hasGeminiModels;
     let hasGemini45h = false;
+
+    if (useSharedGeminiPool) {
+      if (gemini4GroupTitleEl) gemini4GroupTitleEl.textContent = 'Gemini 4 Family';
+      if (gemini4GroupDescEl) {
+        gemini4GroupDescEl.textContent = 'Shared Gemini pool — Hydrogen (Default) · Carbon · Argon · Orchestrator · 3.8 Flash';
+      }
+      if (gemini4WeeklyTitleEl) gemini4WeeklyTitleEl.textContent = 'Weekly Limit';
+      if (gemini4WeeklySubtitleEl) {
+        gemini4WeeklySubtitleEl.textContent = 'Shared across Gemini 4 family & Gemini 3.8 Flash';
+      }
+      if (geminiGroupEl) geminiGroupEl.classList.add('hidden');
+      if (claudeGptGroupEl) claudeGptGroupEl.classList.add('full-span-card');
+      if (claudeMetersContainerEl) claudeMetersContainerEl.classList.add('two-cols');
+    } else if (hasDedicatedGemini4) {
+      if (gemini4GroupDescEl) {
+        gemini4GroupDescEl.textContent = 'Dedicated flagship frontier reasoning allocation — Hydrogen (Default) · Carbon · Argon · Orchestrator';
+      }
+      if (gemini4WeeklySubtitleEl) {
+        gemini4WeeklySubtitleEl.textContent = 'Dedicated flagship weekly rolling allocation';
+      }
+      if (hasGeminiModels) {
+        if (geminiGroupEl) geminiGroupEl.classList.remove('hidden');
+        if (claudeGptGroupEl) claudeGptGroupEl.classList.remove('full-span-card');
+        if (claudeMetersContainerEl) claudeMetersContainerEl.classList.remove('two-cols');
+      }
+    }
 
     quotas.forEach(q => {
       let targetPrefix = '';
 
-      if (/^Gemini 4\b/i.test(q.category)) {
-        if (gemini4GroupTitleEl && q.category) {
+      if (/^Gemini 4\b/i.test(q.category) || (useSharedGeminiPool && q.category === 'Gemini Models')) {
+        if (!useSharedGeminiPool && gemini4GroupTitleEl && q.category) {
           gemini4GroupTitleEl.textContent = q.category;
         }
         if (q.limitType.includes('Five Hour') || q.limitType.includes('5-Hour')) {
@@ -490,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           targetPrefix = 'gemini4Weekly';
           if (gemini4WeeklyTitleEl && q.limitType) {
-            gemini4WeeklyTitleEl.textContent = q.limitType;
+            gemini4WeeklyTitleEl.textContent = useSharedGeminiPool ? 'Weekly Limit' : q.limitType;
           }
         }
       } else if (q.category === 'Gemini Models') {
@@ -652,8 +713,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (percent <= criticalThresh) {
       container.classList.remove('hidden');
-      const primaryActionCmd = isGemini4Card ? 'agy --model gemini-4-argon-low' : 'agy --model gemini-4-argon-medium';
-      const primaryActionLabel = isGemini4Card ? '💎 Use Gemini 4 (Low)' : '💎 Switch to Gemini 4';
+      const lowTargets = {
+        hydrogen: { cmd: 'agy --model gemini-4-hydrogen-low', label: '💎 Use Hydrogen (Low)' },
+        carbon: { cmd: 'agy --model gemini-4-carbon-low', label: '💎 Use Carbon (Low)' },
+        argon: { cmd: 'agy --model gemini-4-argon-low', label: '💎 Use Argon (Low)' }
+      };
+      const lowTarget = lowTargets[activeSubfamily] || lowTargets.hydrogen;
+      const primaryActionCmd = isGemini4Card ? lowTarget.cmd : 'agy --model gemini-4-hydrogen-medium';
+      const primaryActionLabel = isGemini4Card ? lowTarget.label : '💎 Switch to Gemini 4 Hydrogen';
 
       container.innerHTML = `
         <div class="quick-action-header">
@@ -774,8 +841,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (copySwitchGemini4Btn) {
     copySwitchGemini4Btn.addEventListener('click', () => {
-      navigator.clipboard.writeText('agy --model gemini-4-argon-medium');
-      showToast('success', 'Primary Model Command Copied', 'Copied: `agy --model gemini-4-argon-medium` to clipboard');
+      navigator.clipboard.writeText('agy --model gemini-4-hydrogen-medium');
+      showToast('success', 'Primary Model Command Copied', 'Copied: `agy --model gemini-4-hydrogen-medium` to clipboard');
+    });
+  }
+
+  if (gemini4FamilyBarEl) {
+    gemini4FamilyBarEl.querySelectorAll('.family-pill').forEach((pill) => {
+      pill.addEventListener('click', () => {
+        const cmd = pill.dataset.modelCmd;
+        if (cmd) {
+          navigator.clipboard.writeText(cmd);
+          showToast('success', 'Model Switch Command Copied', `Copied: \`${cmd}\` to clipboard`);
+        }
+      });
     });
   }
 

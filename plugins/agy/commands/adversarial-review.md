@@ -1,6 +1,6 @@
 ---
 description: Ask Antigravity CLI to challenge the implementation and hunt for hidden risks
-argument-hint: "[--wait|--background] [--base <ref>] [--timeout <duration>] [--no-sandbox] [focus text]"
+argument-hint: "[--wait|--background] [--base <ref>] [--model <model>] [--effort <low|medium|high|xhigh|max>] [--timeout <duration>] [--no-sandbox] [focus text]"
 disable-model-invocation: true
 allowed-tools: Bash(node:*), Bash(git:*), AskUserQuestion
 ---

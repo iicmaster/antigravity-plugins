@@ -4,8 +4,8 @@ Real-time Quota & Usage Monitor Web Dashboard for Antigravity (`agy`).
 
 ## Features
 
-- **Primary Model First (Gemini 4 Argon)**: Dedicated hero telemetry card and priority alert tracking for **Gemini 4 Argon** (`gemini-4-argon-medium` / `high` / `low`).
-- **Real-Time Quota Tracking**: Visual status bars, burn-rate velocity, session sparklines, and reset countdown timers for Gemini 4 Argon, Gemini 3.8 Flash, and Claude/GPT model quotas.
+- **Primary Family First (Gemini 4 Family — Hydrogen Default)**: Dedicated hero telemetry card (`#gemini4Group`) and interactive family quick-switch bar covering **Gemini 4 Hydrogen** (`gemini-4-hydrogen-medium` / `low` / `high` / `xhigh` — Default Primary), **Gemini 4 Carbon**, **Gemini 4 Argon**, and **Orchestrator** (`Carbon` / `Argon`).
+- **Real-Time Quota Tracking**: Visual status bars, burn-rate velocity, session sparklines, and reset countdown timers for the shared Gemini pool (Gemini 4 Family & Gemini 3.8 Flash) and Claude/GPT model quotas.
 - **AI Premium Credits**: View remaining credits and upgrade link.
 - **Account & Token Status**: Check active model, primary model status, and real-time CLI authentication.
 - **RAW JSON Inspection**: One-click JSON view and copy functionality for debugging `agy` outputs.

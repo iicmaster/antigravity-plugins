@@ -13,6 +13,59 @@ const GO_DURATION_PATTERN = /^(?:\d+(?:\.\d+)?(?:ns|us|µs|ms|s|m|h))+$/;
 const FORCE_KILL_GRACE_MS = 2000;
 const PRINT_SMOKE_SENTINEL = "AGY_SMOKE_OK";
 const PRINT_SMOKE_PROMPT = `Reply with exactly ${PRINT_SMOKE_SENTINEL} and do not run tools.`;
+const SAFE_MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const ALLOWED_EFFORT_LEVELS = new Set(["low", "medium", "high", "xhigh", "max"]);
+
+export const DEFAULT_AGY_MODEL = "gemini-4-hydrogen-medium";
+
+export const GEMINI_4_MODEL_ALIASES = Object.freeze({
+  hydrogen: "gemini-4-hydrogen-medium",
+  "gemini-4-hydrogen": "gemini-4-hydrogen-medium",
+  "hydrogen-low": "gemini-4-hydrogen-low",
+  "hydrogen-medium": "gemini-4-hydrogen-medium",
+  "hydrogen-high": "gemini-4-hydrogen-high",
+  "hydrogen-xhigh": "gemini-4-hydrogen-xhigh",
+  carbon: "gemini-4-carbon-medium",
+  "gemini-4-carbon": "gemini-4-carbon-medium",
+  "carbon-low": "gemini-4-carbon-low",
+  "carbon-medium": "gemini-4-carbon-medium",
+  "carbon-high": "gemini-4-carbon-high",
+  argon: "gemini-4-argon-medium",
+  "gemini-4-argon": "gemini-4-argon-medium",
+  "argon-low": "gemini-4-argon-low",
+  "argon-medium": "gemini-4-argon-medium",
+  "argon-high": "gemini-4-argon-high",
+  orchestrator: "gemini-pro-orchestrator",
+  "orchestrator-carbon": "gemini-pro-orchestrator",
+  "orchestrator-argon": "gemini-pro-orchestrator-argon",
+  flash: "gemini-3.8-flash-high",
+  "flash-low": "gemini-3.8-flash-low",
+  "flash-medium": "gemini-3.8-flash-medium",
+  "flash-high": "gemini-3.8-flash-high"
+});
+
+export function resolveAgyModel(value) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) {
+    return null;
+  }
+  const mapped = GEMINI_4_MODEL_ALIASES[trimmed.toLowerCase()] ?? trimmed;
+  if (!SAFE_MODEL_PATTERN.test(mapped)) {
+    throw new Error("model contains unsupported characters");
+  }
+  return mapped;
+}
+
+export function normalizeEffort(value) {
+  const trimmed = String(value ?? "").trim().toLowerCase();
+  if (!trimmed) {
+    return null;
+  }
+  if (!ALLOWED_EFFORT_LEVELS.has(trimmed)) {
+    throw new Error("effort must be one of low, medium, high, xhigh, or max");
+  }
+  return trimmed;
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -65,6 +118,12 @@ export function normalizeRunOptions(options = {}) {
 
   const logFile = options.logFile ? path.resolve(String(options.logFile)) : null;
   const conversation = options.conversation ? String(options.conversation).trim() : null;
+  const model = options.model != null && String(options.model).trim() !== ""
+    ? resolveAgyModel(options.model)
+    : null;
+  const effort = options.effort != null && String(options.effort).trim() !== ""
+    ? normalizeEffort(options.effort)
+    : null;
 
   return {
     prompt,
@@ -74,7 +133,9 @@ export function normalizeRunOptions(options = {}) {
     sandbox: Boolean(options.sandbox),
     dangerouslySkipPermissions: Boolean(options.dangerouslySkipPermissions),
     continueLast: Boolean(options.continueLast),
-    conversation
+    conversation,
+    model,
+    effort
   };
 }
 
@@ -137,6 +198,12 @@ export function buildAgyArgv(options = {}, supportsPrintTimeout = true) {
   }
   for (const dir of normalized.addDirs) {
     argv.push("--add-dir", dir);
+  }
+  if (normalized.model) {
+    argv.push("--model", normalized.model);
+  }
+  if (normalized.effort) {
+    argv.push("--effort", normalized.effort);
   }
 
   // AGY 1.1.1 auto-enters non-interactive print mode for piped stdin when no
@@ -256,7 +323,9 @@ export function createJob(cwd, options, env = process.env) {
       sandbox: options.sandbox ?? true,
       dangerouslySkipPermissions: Boolean(options.dangerouslySkipPermissions),
       continueLast: Boolean(options.continueLast),
-      conversation: options.conversation ?? null
+      conversation: options.conversation ?? null,
+      model: options.model != null && String(options.model).trim() !== "" ? resolveAgyModel(options.model) : null,
+      effort: options.effort != null && String(options.effort).trim() !== "" ? normalizeEffort(options.effort) : null
     }
   };
 

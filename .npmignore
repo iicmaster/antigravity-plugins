@@ -17,11 +17,15 @@ Thumbs.db
 # Repository guidance and local workflow installs are useful in source checkouts,
 # but they are not part of the plugin payload users install.
 AGENTS.md
+HANDOFF.md
 .agent/
 .claude/
 .agents/skills/
 _bmad/
 .omx/
 .serena/
+.tmux-teams/
+.mailbox-in/
+.mailbox-out/
 plugin-data/
 .agy-state/

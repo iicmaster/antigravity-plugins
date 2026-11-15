@@ -40,7 +40,7 @@
         <div class="brand-text">
           <div class="brand-title-row">
             <h1>Antigravity <span>Quota Monitor</span></h1>
-            <span class="version-tag" id="pluginVersion" title="Plugin Version">v0.5.0</span>
+            <span class="version-tag" id="pluginVersion" title="Plugin Version">v0.6.0</span>
           </div>
           <p class="subtitle">Real-time quota governance and usage telemetry</p>
         </div>
@@ -153,25 +153,56 @@
 
     <!-- Main Quota Grid -->
     <main class="dashboard-grid">
-      <!-- Gemini 4 Primary Flagship Model Section -->
+      <!-- Gemini 4 Primary Flagship Family Section -->
       <section class="quota-group-card primary-group-card" id="gemini4Group">
         <div class="group-header">
           <div class="group-title">
             <span class="group-logo gemini4-logo">💎</span>
             <div>
               <div class="group-title-row">
-                <h2 id="gemini4GroupTitle">Gemini 4 Argon</h2>
+                <h2 id="gemini4GroupTitle">Gemini 4 Family</h2>
                 <span class="primary-model-pill" id="gemini4ActiveBadge">● PRIMARY ACTIVE</span>
               </div>
-              <span class="group-desc">Primary flagship frontier reasoning allocation (Low / Medium / High)</span>
+              <span class="group-desc" id="gemini4GroupDesc">Flagship frontier reasoning family — Hydrogen (Default) · Carbon · Argon · Orchestrator</span>
             </div>
           </div>
           <div class="group-badge-cluster">
-            <button id="copySwitchGemini4Btn" class="btn-chip hidden" title="Copy command to switch to Gemini 4 Argon (Medium)">
-              ⚡ Use Gemini 4
+            <button id="copySwitchGemini4Btn" class="btn-chip hidden" title="Copy command to switch to Gemini 4 Hydrogen (Medium)">
+              ⚡ Use Gemini 4 Hydrogen
             </button>
             <span class="group-badge badge-primary-tier">PRIMARY · GOOGLE AI</span>
           </div>
+        </div>
+
+        <div class="family-bar" id="gemini4FamilyBar" role="group" aria-label="Gemini 4 Family Quick Switch">
+          <button type="button" class="family-pill" data-subfamily="hydrogen" data-model-cmd="agy --model gemini-4-hydrogen-medium" aria-pressed="true">
+            <span class="family-pill-top">
+              <span class="family-pill-name">Hydrogen</span>
+              <span class="family-pill-tag">DEFAULT</span>
+            </span>
+            <span class="family-pill-meta">Low · Med · High · XHigh</span>
+          </button>
+          <button type="button" class="family-pill" data-subfamily="carbon" data-model-cmd="agy --model gemini-4-carbon-medium" aria-pressed="false">
+            <span class="family-pill-top">
+              <span class="family-pill-name">Carbon</span>
+              <span class="family-pill-tag">REASONING</span>
+            </span>
+            <span class="family-pill-meta">Low · Med · High</span>
+          </button>
+          <button type="button" class="family-pill" data-subfamily="argon" data-model-cmd="agy --model gemini-4-argon-medium" aria-pressed="false">
+            <span class="family-pill-top">
+              <span class="family-pill-name">Argon</span>
+              <span class="family-pill-tag">FRONTIER</span>
+            </span>
+            <span class="family-pill-meta">Low · Med · High</span>
+          </button>
+          <button type="button" class="family-pill" data-subfamily="orchestrator" data-model-cmd="agy --model gemini-pro-orchestrator" aria-pressed="false">
+            <span class="family-pill-top">
+              <span class="family-pill-name">Orchestrator</span>
+              <span class="family-pill-tag">AGENTIC</span>
+            </span>
+            <span class="family-pill-meta">Carbon · Argon</span>
+          </button>
         </div>
 
         <div class="meters-container primary-meters-container" id="gemini4MetersContainer">
@@ -180,10 +211,10 @@
             <div class="meter-header">
               <div class="meter-title">
                 <div class="meter-title-row">
-                  <h3 id="gemini4WeeklyTitle">Gemini 4 Argon Weekly Limit</h3>
+                  <h3 id="gemini4WeeklyTitle">Weekly Limit</h3>
                   <span class="burn-rate-badge" id="gemini4WeeklyBurnRate">🟢 Stable</span>
                 </div>
-                <span class="meter-subtitle">Dedicated flagship weekly rolling allocation</span>
+                <span class="meter-subtitle" id="gemini4WeeklySubtitle">Shared Gemini 4 family &amp; 3.8 Flash weekly rolling allocation</span>
               </div>
               <div class="meter-percent" id="gemini4WeeklyPercent">...</div>
             </div>
@@ -358,7 +389,7 @@
           <span class="group-badge">ANTHROPIC / OPENAI</span>
         </div>
 
-        <div class="meters-container">
+        <div class="meters-container" id="claudeMetersContainer">
           <!-- Claude/GPT Weekly -->
           <div class="meter-card" id="meter-claude-weekly">
             <div class="meter-header">

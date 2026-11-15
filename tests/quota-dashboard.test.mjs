@@ -31,12 +31,36 @@ test("quota dashboard server supports process.env.PORT, account extraction, and 
   assert.match(serverCode, /process\.env\.PORT || 3838/);
   assert.match(serverCode, /\/api\/quota/);
   assert.match(serverCode, /getAccountInfo/);
-  assert.match(serverCode, /DEFAULT_PRIMARY_MODEL = 'Gemini 4 Argon \(Medium\)'/);
+  assert.match(serverCode, /DEFAULT_PRIMARY_MODEL = 'Gemini 4 Hydrogen \(Medium\)'/);
+  assert.match(serverCode, /gemini-4-hydrogen-medium/);
+  assert.match(serverCode, /isSharedGeminiPool/);
   assert.match(serverCode, /gemini4Weekly/);
   assert.match(serverCode, /\/api\/notifications\/settings/);
   assert.match(serverCode, /\/api\/notifications\/test/);
   assert.match(serverCode, /evaluateQuotaAlerts/);
   assert.match(serverCode, /sendOsNotification/);
+});
+
+test("quota dashboard server and MCP server define all 3 Gemini 4 models (Carbon, Argon, Hydrogen) and Orchestrator", () => {
+  for (const filename of ["server.js", "mcp-server.js"]) {
+    const code = readText(filename);
+    for (const modelId of [
+      "gemini-4-hydrogen-low",
+      "gemini-4-hydrogen-medium",
+      "gemini-4-hydrogen-high",
+      "gemini-4-hydrogen-xhigh",
+      "gemini-4-carbon-low",
+      "gemini-4-carbon-medium",
+      "gemini-4-carbon-high",
+      "gemini-4-argon-low",
+      "gemini-4-argon-medium",
+      "gemini-4-argon-high"
+    ]) {
+      assert.ok(code.includes(modelId), `${filename} should define ${modelId}`);
+    }
+    assert.ok(code.includes("Orchestrator (Carbon)"), `${filename} should map Orchestrator (Carbon)`);
+    assert.ok(code.includes("Orchestrator (Argon)"), `${filename} should map Orchestrator (Argon)`);
+  }
 });
 
 test("quota dashboard alerts fire once per quota cycle without cooldown repeats", () => {
@@ -70,6 +94,16 @@ test("quota dashboard UI includes account cards, notification controls, toast co
   assert.match(html, /id="accountEmail"/, "index.html should have accountEmail");
   assert.match(html, /id="pluginVersion"/, "index.html should have pluginVersion");
   assert.match(html, /id="gemini4Group"/, "index.html should have gemini4Group primary section");
+  assert.match(html, /id="gemini4FamilyBar"/, "index.html should have gemini4FamilyBar quick-switch section");
+  assert.match(html, /data-subfamily="hydrogen"/, "index.html should include Hydrogen family pill");
+  assert.match(html, /data-subfamily="carbon"/, "index.html should include Carbon family pill");
+  assert.match(html, /data-subfamily="argon"/, "index.html should include Argon family pill");
+  assert.match(html, /data-subfamily="orchestrator"/, "index.html should include Orchestrator family pill");
+  assert.match(html, /data-model-cmd="agy --model gemini-4-hydrogen-medium"/, "index.html should include Hydrogen CLI switch command");
+  assert.match(html, /data-model-cmd="agy --model gemini-4-carbon-medium"/, "index.html should include Carbon CLI switch command");
+  assert.match(html, /data-model-cmd="agy --model gemini-4-argon-medium"/, "index.html should include Argon CLI switch command");
+  assert.match(html, /data-model-cmd="agy --model gemini-pro-orchestrator"/, "index.html should include Orchestrator CLI switch command");
+  assert.match(html, /Orchestrator/, "index.html should include Orchestrator in Gemini 4 family");
   assert.match(html, /id="gemini4WeeklyPercent"/, "index.html should have gemini4WeeklyPercent");
   assert.match(html, /id="notifBtn"/, "index.html should have notifBtn");
   assert.match(html, /id="toastContainer"/, "index.html should have toastContainer");
@@ -88,7 +122,12 @@ test("quota dashboard UI includes account cards, notification controls, toast co
   assert.match(js, /accountEmailEl/, "app.js should bind accountEmailEl");
   assert.match(js, /pluginVersionEl/, "app.js should bind pluginVersionEl");
   assert.match(js, /gemini4Weekly/, "app.js should handle gemini4Weekly quota history and meters");
-  assert.match(js, /Gemini 4 Argon \(Medium\)/, "app.js should default to Gemini 4 Argon (Medium)");
+  assert.match(js, /Gemini 4 Hydrogen \(Medium\)/, "app.js should default to Gemini 4 Hydrogen (Medium)");
+  assert.match(js, /useSharedGeminiPool/, "app.js should support shared Gemini quota pool routing");
+  assert.match(js, /gemini-4-hydrogen-medium/, "app.js should reference gemini-4-hydrogen-medium");
+  assert.match(js, /gemini-4-carbon-low/, "app.js should reference gemini-4-carbon-low");
+  assert.match(js, /gemini-4-argon-low/, "app.js should reference gemini-4-argon-low");
+  assert.match(js, /gemini-4-hydrogen-low/, "app.js should reference gemini-4-hydrogen-low");
   assert.match(js, /playChime/, "app.js should have playChime function");
   assert.match(js, /showToast/, "app.js should have showToast function");
   assert.match(js, /showBrowserPush/, "app.js should have showBrowserPush function");
