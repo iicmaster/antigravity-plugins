@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.6.0 - 2026-11-15
+
+### Added
+
+- **Gemini 4 Family Support & Hydrogen Default**:
+  - Updated Quota Dashboard default flagship model fallback and `agy-runtime.mjs` `DEFAULT_AGY_MODEL` flagship catalog constant to **`Gemini 4 Hydrogen (Medium)`** (`gemini-4-hydrogen-medium`) across `server.js`, `mcp-server.js`, `app.js`, and `index.html`; omitting `--model` in `plugins/agy` continues to respect the user's configured local `agy` model.
+  - Redesigned the primary Quota Dashboard card (`#gemini4Group`) as **Gemini 4 Family** with an interactive 4-pill quick-switch bar (`Hydrogen` default, `Carbon`, `Argon`, `Orchestrator` with `Shift+Click` for `gemini-pro-orchestrator-argon`), subfamily-aware critical fallback recommendations (`gemini-4-hydrogen-low`, `gemini-4-carbon-low`, `gemini-4-argon-low`, `gemini-3.8-flash-high`), `textContent`-safe toast rendering, and awaited clipboard writes with failure reporting.
+  - Added smart unified Gemini quota pool routing in `server.js`, `mcp-server.js`, and `app.js` so `agy -p "/usage"` `"Gemini Models"` shared pools populate `#gemini4Group` cleanly without stalled `Loading...` states or duplicate Gemini cards.
+  - Added optional `--model` and `--effort` flag support to `plugins/agy` (`agy-runtime.mjs`, `agy-companion.mjs`, `agy-mcp-server.mjs`) with Gemini 4 family shorthand aliases (`hydrogen`, `hydrogen-xhigh`, `carbon`, `argon`, `orchestrator`, `orchestrator-argon`, `flash`); requires AGY CLI `1.1.5+` when overriding `--model` / `--effort` (verified live on `1.5.9`).
+
 ## 0.5.1 - 2026-10-31
 
 ### Fixed

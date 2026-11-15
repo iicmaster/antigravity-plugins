@@ -52,11 +52,11 @@ Prefer the MCP tools `agy_adversarial_review` or `agy_review` when available.
 Fallback via script wrapper:
 
 ```bash
-# Sequential inspection on working tree changes
-node plugins/agy/skills/agy/scripts/agy-codex.mjs review "Apply sqthink diff inspection: focus on concurrency and regressions"
+# Sequential inspection on working tree changes (Carbon / Hydrogen / Argon)
+node plugins/agy/skills/agy/scripts/agy-codex.mjs review "--model hydrogen Apply sqthink diff inspection: focus on concurrency and regressions"
 
 # Deep adversarial inspection against base branch
-node plugins/agy/skills/agy/scripts/agy-codex.mjs adversarial-review "--base main Apply sqthink pipeline to audit security boundaries"
+node plugins/agy/skills/agy/scripts/agy-codex.mjs adversarial-review "--base main --model argon Apply sqthink pipeline to audit security boundaries"
 ```
 
 ---

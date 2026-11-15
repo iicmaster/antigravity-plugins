@@ -25,3 +25,7 @@ _bmad/
 # Runtime state should stay outside the repository.
 plugin-data/
 .agy-state/
+HANDOFF.md
+.tmux-teams/
+.mailbox-in/
+.mailbox-out/

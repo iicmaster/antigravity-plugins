@@ -30,19 +30,27 @@ node "<path-to-this-skill>/scripts/agy-codex.mjs" <command> "<raw arguments>"
 Supported commands:
 
 - `setup` checks whether AGY 1.1.1 or newer is available with the required capabilities. Use `setup --smoke` or MCP `agy_setup` with `smoke: true` to run a minimal implicit-stdin completion check.
-- `review` sends current git status and diff to AGY for review.
-- `adversarial-review` sends current git status and diff to AGY for a stricter review.
-- `rescue` delegates a bounded task to AGY. The Codex MCP tool intentionally keeps AGY sandboxing on and does not expose dangerous permission-bypass flags.
+- `review` sends current git status and diff to AGY for review (supports optional `--model` and `--effort`).
+- `adversarial-review` sends current git status and diff to AGY for a stricter review (supports optional `--model` and `--effort`).
+- `rescue` delegates a bounded task to AGY (supports optional `--model` and `--effort`). The Codex MCP tool intentionally keeps AGY sandboxing on and does not expose dangerous permission-bypass flags.
 - `status` shows recent AGY jobs for the current workspace.
 - `result <job-id>` prints captured output for a job.
 - `cancel <job-id>` cancels a queued or running job.
+
+Gemini 4 family aliases accepted by `--model` (or MCP `model` argument; omitting `--model` keeps your local `agy` configured default; `--model` / `--effort` require AGY `1.1.5+`, while core print mode requires `1.1.1+`):
+
+- `hydrogen` / `gemini-4-hydrogen` (`gemini-4-hydrogen-medium` flagship alias), `hydrogen-low`, `hydrogen-medium`, `hydrogen-high`, `hydrogen-xhigh`
+- `carbon` / `gemini-4-carbon` (`gemini-4-carbon-medium`), `carbon-low`, `carbon-medium`, `carbon-high`
+- `argon` / `gemini-4-argon` (`gemini-4-argon-medium`), `argon-low`, `argon-medium`, `argon-high`
+- `orchestrator` / `orchestrator-carbon` (`gemini-pro-orchestrator` — `Orchestrator (Carbon)`), `orchestrator-argon` (`gemini-pro-orchestrator-argon` — `Orchestrator (Argon)`)
+- `flash` (`gemini-3.8-flash-high`), `flash-medium`, `flash-low`
 
 Examples:
 
 ```bash
 node "<path-to-this-skill>/scripts/agy-codex.mjs" setup
-node "<path-to-this-skill>/scripts/agy-codex.mjs" review "--base main security focus"
-node "<path-to-this-skill>/scripts/agy-codex.mjs" rescue "--background --timeout 30s investigate the failing test"
+node "<path-to-this-skill>/scripts/agy-codex.mjs" review "--base main --model hydrogen --effort high security focus"
+node "<path-to-this-skill>/scripts/agy-codex.mjs" rescue "--background --model carbon --timeout 30s investigate the failing test"
 node "<path-to-this-skill>/scripts/agy-codex.mjs" status
 node "<path-to-this-skill>/scripts/agy-codex.mjs" result "<job-id>"
 ```

@@ -56,11 +56,11 @@ Prefer the MCP tool `agy_rescue` when available.
 Fallback via script wrapper:
 
 ```bash
-# Sequential rescue on a failing test suite
-node plugins/agy/skills/agy/scripts/agy-codex.mjs rescue "Use sqthink to diagnose and fix the failing test in tests/quota-dashboard.test.mjs"
+# Sequential rescue on a failing test suite (Carbon / Hydrogen / Argon)
+node plugins/agy/skills/agy/scripts/agy-codex.mjs rescue "--model carbon Use sqthink to diagnose and fix the failing test in tests/quota-dashboard.test.mjs"
 
 # Background deep investigation with timeout
-node plugins/agy/skills/agy/scripts/agy-codex.mjs rescue "--background --timeout 45s Use sqthink to isolate memory leak in server.js"
+node plugins/agy/skills/agy/scripts/agy-codex.mjs rescue "--background --model argon --timeout 45s Use sqthink to isolate memory leak in server.js"
 ```
 
 ## 📊 Status & Job Inspection

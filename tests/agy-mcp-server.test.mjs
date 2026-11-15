@@ -247,3 +247,89 @@ test("AGY MCP setup can run print-mode smoke check", async () => {
     client.close();
   }
 });
+
+test("AGY MCP review and rescue forward Gemini 4 family model and effort cleanly", async () => {
+  const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "agy-bin-model-"));
+  writeFakeAgy(binDir);
+  const client = createMcpClient({
+    ...process.env,
+    PATH: `${binDir}${path.delimiter}${process.env.PATH}`
+  });
+
+  try {
+    await client.request("initialize", {
+      protocolVersion: "2024-11-05",
+      capabilities: {},
+      clientInfo: { name: "test", version: "0.0.0" }
+    });
+
+    const rescueRes = await client.request("tools/call", {
+      name: "agy_rescue",
+      arguments: {
+        task: "--no-sandbox inspect",
+        model: "hydrogen",
+        effort: "xhigh"
+      }
+    });
+    const rescueInvocation = fakeAgyInvocation(rescueRes);
+    const modelIdx = rescueInvocation.argv.indexOf("--model");
+    assert.notEqual(modelIdx, -1);
+    assert.equal(rescueInvocation.argv[modelIdx + 1], "gemini-4-hydrogen-medium");
+    const effortIdx = rescueInvocation.argv.indexOf("--effort");
+    assert.notEqual(effortIdx, -1);
+    assert.equal(rescueInvocation.argv[effortIdx + 1], "xhigh");
+    assert.match(rescueInvocation.stdin, /--no-sandbox inspect/);
+
+    const reviewRes = await client.request("tools/call", {
+      name: "agy_review",
+      arguments: {
+        focus: "check argon model",
+        model: "argon",
+        effort: "medium"
+      }
+    });
+    const reviewInvocation = fakeAgyInvocation(reviewRes);
+    const reviewModelIdx = reviewInvocation.argv.indexOf("--model");
+    assert.notEqual(reviewModelIdx, -1);
+    assert.equal(reviewInvocation.argv[reviewModelIdx + 1], "gemini-4-argon-medium");
+    const reviewEffortIdx = reviewInvocation.argv.indexOf("--effort");
+    assert.notEqual(reviewEffortIdx, -1);
+    assert.equal(reviewInvocation.argv[reviewEffortIdx + 1], "medium");
+
+    const advReviewRes = await client.request("tools/call", {
+      name: "agy_adversarial_review",
+      arguments: {
+        focus: "check carbon model",
+        model: "carbon",
+        effort: "high"
+      }
+    });
+    const advInvocation = fakeAgyInvocation(advReviewRes);
+    const advModelIdx = advInvocation.argv.indexOf("--model");
+    assert.notEqual(advModelIdx, -1);
+    assert.equal(advInvocation.argv[advModelIdx + 1], "gemini-4-carbon-medium");
+    const advEffortIdx = advInvocation.argv.indexOf("--effort");
+    assert.notEqual(advEffortIdx, -1);
+    assert.equal(advInvocation.argv[advEffortIdx + 1], "high");
+
+    const orchRes = await client.request("tools/call", {
+      name: "agy_review",
+      arguments: {
+        focus: "check architecture",
+        model: "orchestrator"
+      }
+    });
+    const orchInvocation = fakeAgyInvocation(orchRes);
+    const orchModelIdx = orchInvocation.argv.indexOf("--model");
+    assert.notEqual(orchModelIdx, -1);
+    assert.equal(orchInvocation.argv[orchModelIdx + 1], "gemini-pro-orchestrator");
+
+    const badModel = await client.request("tools/call", {
+      name: "agy_rescue",
+      arguments: { task: "inspect", model: "--bad" }
+    });
+    assert.match(badModel.error.message, /unsupported characters/i);
+  } finally {
+    client.close();
+  }
+});

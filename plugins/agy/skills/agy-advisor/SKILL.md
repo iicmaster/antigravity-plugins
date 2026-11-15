@@ -69,8 +69,8 @@ Prefer the MCP tool `agy_rescue` / `agy_review` with advisor prompt framing:
 Fallback via script wrapper:
 
 ```bash
-# Request an architectural second opinion with sqthink reasoning
-node plugins/agy/skills/agy/scripts/agy-codex.mjs rescue "Apply sqthink to provide an architectural second opinion on [proposed design/question]"
+# Request an architectural second opinion with sqthink reasoning (Hydrogen default or Carbon/Argon)
+node plugins/agy/skills/agy/scripts/agy-codex.mjs rescue "--model carbon Apply sqthink to provide an architectural second opinion on [proposed design/question]"
 ```
 
 ---

@@ -7,7 +7,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { FAST_OP_TIMEOUT_MS, setupBackstopMs } from "./lib/agy-mcp-policy.mjs";
-import { goDurationToMilliseconds } from "./lib/agy-runtime.mjs";
+import { goDurationToMilliseconds, normalizeEffort, resolveAgyModel } from "./lib/agy-runtime.mjs";
 
 const PLUGIN_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const COMPANION = path.join(PLUGIN_ROOT, "scripts", "agy-companion.mjs");
@@ -80,7 +80,9 @@ const tools = [
         focus: { type: "string", description: "Optional review focus." },
         base: { type: "string", description: "Optional base ref for git diff base...HEAD." },
         timeout: { type: "string", description: "Go duration such as 30s or 10m0s." },
-        background: { type: "boolean", description: "Run AGY in the background." }
+        background: { type: "boolean", description: "Run AGY in the background." },
+        model: { type: "string", description: "Optional AGY model ID or Gemini 4 alias (e.g. hydrogen, gemini-4-hydrogen-medium, carbon, argon, orchestrator, flash)." },
+        effort: { type: "string", enum: ["low", "medium", "high", "xhigh", "max"], description: "Optional reasoning effort level." }
       }
     }
   },
@@ -94,7 +96,9 @@ const tools = [
         focus: { type: "string", description: "Optional adversarial review focus." },
         base: { type: "string", description: "Optional base ref for git diff base...HEAD." },
         timeout: { type: "string", description: "Go duration such as 30s or 10m0s." },
-        background: { type: "boolean", description: "Run AGY in the background." }
+        background: { type: "boolean", description: "Run AGY in the background." },
+        model: { type: "string", description: "Optional AGY model ID or Gemini 4 alias (e.g. hydrogen, gemini-4-hydrogen-medium, carbon, argon, orchestrator, flash)." },
+        effort: { type: "string", enum: ["low", "medium", "high", "xhigh", "max"], description: "Optional reasoning effort level." }
       }
     }
   },
@@ -108,7 +112,9 @@ const tools = [
       properties: {
         task: { type: "string", description: "Bounded AGY task text." },
         timeout: { type: "string", description: "Go duration such as 30s or 10m0s." },
-        background: { type: "boolean", description: "Run AGY in the background." }
+        background: { type: "boolean", description: "Run AGY in the background." },
+        model: { type: "string", description: "Optional AGY model ID or Gemini 4 alias (e.g. hydrogen, gemini-4-hydrogen-medium, carbon, argon, orchestrator, flash)." },
+        effort: { type: "string", enum: ["low", "medium", "high", "xhigh", "max"], description: "Optional reasoning effort level." }
       }
     }
   }
@@ -195,6 +201,14 @@ function addCommonRunArgs(argv, args) {
   if (timeout) {
     argv.push("--timeout", timeout);
   }
+  const rawModel = optionalString(args, "model", { max: 128 });
+  if (rawModel) {
+    argv.push("--model", resolveAgyModel(rawModel));
+  }
+  const rawEffort = optionalString(args, "effort", { max: 16 });
+  if (rawEffort) {
+    argv.push("--effort", normalizeEffort(rawEffort));
+  }
 }
 
 function runBackstopMs(args) {
@@ -233,7 +247,7 @@ function jobArg(args, required = false) {
 }
 
 function reviewArgs(args) {
-  rejectUnknown(args, ["focus", "base", "timeout", "background"]);
+  rejectUnknown(args, ["focus", "base", "timeout", "background", "model", "effort"]);
   const argv = [];
   addCommonRunArgs(argv, args);
   const base = optionalString(args, "base", { max: 128, pattern: SAFE_REF_PATTERN });
@@ -261,7 +275,7 @@ function setupArgs(args) {
 }
 
 function rescueArgs(args) {
-  rejectUnknown(args, ["task", "timeout", "background"]);
+  rejectUnknown(args, ["task", "timeout", "background", "model", "effort"]);
   const argv = [];
   addCommonRunArgs(argv, args);
   argv.push("--", requiredString(args, "task", { max: 8000 }));

@@ -98,6 +98,8 @@ function parseArgs(argv) {
       case "--base":
       case "--timeout":
       case "--conversation":
+      case "--model":
+      case "--effort":
       case "--add-dir":
         if (tokens[index + 1] == null) {
           throw new Error(`${token} requires a value`);
@@ -211,7 +213,9 @@ async function runPromptJob(kind, prompt, options) {
     // unsandboxed runs still require the explicit flag.
     dangerouslySkipPermissions: Boolean(options["dangerously-skip-permissions"]) || sandbox,
     continueLast: Boolean(options.continue),
-    conversation: options.conversation ?? null
+    conversation: options.conversation ?? null,
+    model: options.model ?? null,
+    effort: options.effort ?? null
   });
 
   if (options.background) {

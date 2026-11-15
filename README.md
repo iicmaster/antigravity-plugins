@@ -112,10 +112,20 @@ For local development, replace the GitHub URL with your local checkout path.
 ### Claude Commands
 
 - `/agy:setup` checks whether `agy` is installed and exposes the flags this plugin needs. Add `--smoke` to run a minimal print-mode completion check.
-- `/agy:review` sends the current git context to `agy` for read-only review.
-- `/agy:adversarial-review` sends a stricter review prompt focused on hidden risks.
-- `/agy:rescue` delegates a bounded investigation or fix request to `agy`.
+- `/agy:review` sends the current git context to `agy` for read-only review (supports `--model` and `--effort`).
+- `/agy:adversarial-review` sends a stricter review prompt focused on hidden risks (supports `--model` and `--effort`).
+- `/agy:rescue` delegates a bounded investigation or fix request to `agy` (supports `--model` and `--effort`).
 - `/agy:status`, `/agy:result`, and `/agy:cancel` manage jobs launched by the companion runtime.
+
+Optional Gemini 4 family `--model` aliases accepted by `review`, `adversarial-review`, `rescue`, and Codex MCP tools (`agy_review`, `agy_adversarial_review`, `agy_rescue`):
+
+- `hydrogen` (`gemini-4-hydrogen-medium` flagship alias), `hydrogen-low`, `hydrogen-high`, `hydrogen-xhigh`
+- `carbon` (`gemini-4-carbon-medium`), `carbon-low`, `carbon-high`
+- `argon` (`gemini-4-argon-medium`), `argon-low`, `argon-high`
+- `orchestrator` / `orchestrator-carbon` (`gemini-pro-orchestrator`), `orchestrator-argon` (`gemini-pro-orchestrator-argon`)
+- `flash` (`gemini-3.8-flash-high`)
+
+And optional `--effort` / MCP `effort`: `low`, `medium`, `high`, `xhigh`, `max`. Omitting `--model` keeps the user's local `agy` default model; passing `--model` / `--effort` requires AGY CLI `1.1.5` or newer (core print mode works on `1.1.1+`).
 
 ## Install In Codex
 
