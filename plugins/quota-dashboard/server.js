@@ -713,6 +713,29 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`🚀 Antigravity Quota Dashboard running at http://localhost:${PORT}`);
-});
+const isMainModule = (() => {
+  try {
+    return Boolean(process.argv[1]) && fs.realpathSync(process.argv[1]) === fs.realpathSync(__filename);
+  } catch {
+    return false;
+  }
+})();
+
+if (isMainModule) {
+  server.listen(PORT, () => {
+    console.log(`🚀 Antigravity Quota Dashboard running at http://localhost:${PORT}`);
+  });
+}
+
+export {
+  DEFAULT_PRIMARY_MODEL,
+  DEFAULT_PRIMARY_MODEL_ID,
+  GEMINI4_FAMILY_MODELS,
+  MODEL_ID_TO_LABEL,
+  detectGemini4Subfamily,
+  formatModelDisplayName,
+  isGemini4Category,
+  isGemini4Model,
+  parseCreditsOutput,
+  parseUsageOutput
+};

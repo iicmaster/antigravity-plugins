@@ -37,9 +37,9 @@ Supported commands:
 - `result <job-id>` prints captured output for a job.
 - `cancel <job-id>` cancels a queued or running job.
 
-Gemini 4 family aliases accepted by `--model` (or MCP `model` argument):
+Gemini 4 family aliases accepted by `--model` (or MCP `model` argument; omitting `--model` keeps your local `agy` configured default; `--model` / `--effort` require AGY `1.1.5+`, while core print mode requires `1.1.1+`):
 
-- `hydrogen` / `gemini-4-hydrogen` (default alias -> `gemini-4-hydrogen-medium`), `hydrogen-low`, `hydrogen-medium`, `hydrogen-high`, `hydrogen-xhigh`
+- `hydrogen` / `gemini-4-hydrogen` (`gemini-4-hydrogen-medium` flagship alias), `hydrogen-low`, `hydrogen-medium`, `hydrogen-high`, `hydrogen-xhigh`
 - `carbon` / `gemini-4-carbon` (`gemini-4-carbon-medium`), `carbon-low`, `carbon-medium`, `carbon-high`
 - `argon` / `gemini-4-argon` (`gemini-4-argon-medium`), `argon-low`, `argon-medium`, `argon-high`
 - `orchestrator` / `orchestrator-carbon` (`gemini-pro-orchestrator` — `Orchestrator (Carbon)`), `orchestrator-argon` (`gemini-pro-orchestrator-argon` — `Orchestrator (Argon)`)

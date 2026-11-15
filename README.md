@@ -119,13 +119,13 @@ For local development, replace the GitHub URL with your local checkout path.
 
 Optional Gemini 4 family `--model` aliases accepted by `review`, `adversarial-review`, `rescue`, and Codex MCP tools (`agy_review`, `agy_adversarial_review`, `agy_rescue`):
 
-- `hydrogen` (`gemini-4-hydrogen-medium` default), `hydrogen-low`, `hydrogen-high`, `hydrogen-xhigh`
+- `hydrogen` (`gemini-4-hydrogen-medium` flagship alias), `hydrogen-low`, `hydrogen-high`, `hydrogen-xhigh`
 - `carbon` (`gemini-4-carbon-medium`), `carbon-low`, `carbon-high`
 - `argon` (`gemini-4-argon-medium`), `argon-low`, `argon-high`
 - `orchestrator` / `orchestrator-carbon` (`gemini-pro-orchestrator`), `orchestrator-argon` (`gemini-pro-orchestrator-argon`)
 - `flash` (`gemini-3.8-flash-high`)
 
-And optional `--effort` / MCP `effort`: `low`, `medium`, `high`, `xhigh`, `max`.
+And optional `--effort` / MCP `effort`: `low`, `medium`, `high`, `xhigh`, `max`. Omitting `--model` keeps the user's local `agy` default model; passing `--model` / `--effort` requires AGY CLI `1.1.5` or newer (core print mode works on `1.1.1+`).
 
 ## Install In Codex
 

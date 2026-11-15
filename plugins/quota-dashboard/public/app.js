@@ -215,17 +215,30 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (type === 'success') icon = '✨';
     else if (type === 'warning') icon = '⚡';
 
-    toast.innerHTML = `
-      <div class="toast-icon">${icon}</div>
-      <div class="toast-content">
-        <div class="toast-title">${title}</div>
-        <div class="toast-message">${message}</div>
-      </div>
-      <button class="toast-close" aria-label="Close">&times;</button>
-    `;
+    const iconEl = document.createElement('div');
+    iconEl.className = 'toast-icon';
+    iconEl.textContent = icon;
 
-    const closeBtn = toast.querySelector('.toast-close');
+    const contentEl = document.createElement('div');
+    contentEl.className = 'toast-content';
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'toast-title';
+    titleEl.textContent = String(title ?? '');
+
+    const msgEl = document.createElement('div');
+    msgEl.className = 'toast-message';
+    msgEl.textContent = String(message ?? '');
+
+    contentEl.append(titleEl, msgEl);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-close';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.textContent = '×';
     closeBtn.addEventListener('click', () => dismissToast(toast));
+
+    toast.append(iconEl, contentEl, closeBtn);
 
     toastContainer.appendChild(toast);
     requestAnimationFrame(() => {
@@ -235,6 +248,23 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
       dismissToast(toast);
     }, 6000);
+  }
+
+  async function copyToClipboard(text, title, successMessage) {
+    if (!navigator.clipboard?.writeText) {
+      showToast('warning', 'Clipboard Unavailable', `Copy manually: ${text}`);
+      return false;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      if (title) {
+        showToast('success', title, successMessage);
+      }
+      return true;
+    } catch {
+      showToast('warning', 'Clipboard Permission Denied', `Copy manually: ${text}`);
+      return false;
+    }
   }
 
   function dismissToast(toast) {
@@ -718,7 +748,11 @@ document.addEventListener('DOMContentLoaded', () => {
         carbon: { cmd: 'agy --model gemini-4-carbon-low', label: '💎 Use Carbon (Low)' },
         argon: { cmd: 'agy --model gemini-4-argon-low', label: '💎 Use Argon (Low)' }
       };
-      const lowTarget = lowTargets[activeSubfamily] || lowTargets.hydrogen;
+      const activeName = activeModelEl?.textContent || '';
+      const resolvedSubfamily = activeSubfamily === 'orchestrator'
+        ? (/argon/i.test(activeName) ? 'argon' : 'carbon')
+        : activeSubfamily;
+      const lowTarget = lowTargets[resolvedSubfamily] || lowTargets.hydrogen;
       const primaryActionCmd = isGemini4Card ? lowTarget.cmd : 'agy --model gemini-4-hydrogen-medium';
       const primaryActionLabel = isGemini4Card ? lowTarget.label : '💎 Switch to Gemini 4 Hydrogen';
 
@@ -742,16 +776,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const primaryBtn = container.querySelector('[data-action="switch-primary"]');
       if (primaryBtn) {
         primaryBtn.addEventListener('click', () => {
-          navigator.clipboard.writeText(primaryActionCmd);
-          showToast('success', 'Model Switch Command Copied', `Copied: \`${primaryActionCmd}\` to clipboard`);
+          copyToClipboard(primaryActionCmd, 'Model Switch Command Copied', `Copied: \`${primaryActionCmd}\` to clipboard`);
         });
       }
 
       const switchBtn = container.querySelector('[data-action="switch-flash"]');
       if (switchBtn) {
         switchBtn.addEventListener('click', () => {
-          navigator.clipboard.writeText('agy --model gemini-3.8-flash-high');
-          showToast('success', 'Model Switch Command Copied', 'Copied: `agy --model gemini-3.8-flash-high` to clipboard');
+          copyToClipboard('agy --model gemini-3.8-flash-high', 'Model Switch Command Copied', 'Copied: `agy --model gemini-3.8-flash-high` to clipboard');
         });
       }
     } else if (percent <= warningThresh) {
@@ -841,18 +873,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (copySwitchGemini4Btn) {
     copySwitchGemini4Btn.addEventListener('click', () => {
-      navigator.clipboard.writeText('agy --model gemini-4-hydrogen-medium');
-      showToast('success', 'Primary Model Command Copied', 'Copied: `agy --model gemini-4-hydrogen-medium` to clipboard');
+      copyToClipboard('agy --model gemini-4-hydrogen-medium', 'Primary Model Command Copied', 'Copied: `agy --model gemini-4-hydrogen-medium` to clipboard');
     });
   }
 
   if (gemini4FamilyBarEl) {
     gemini4FamilyBarEl.querySelectorAll('.family-pill').forEach((pill) => {
-      pill.addEventListener('click', () => {
-        const cmd = pill.dataset.modelCmd;
+      pill.addEventListener('click', (e) => {
+        const cmd = e.shiftKey && pill.dataset.modelAltCmd ? pill.dataset.modelAltCmd : pill.dataset.modelCmd;
         if (cmd) {
-          navigator.clipboard.writeText(cmd);
-          showToast('success', 'Model Switch Command Copied', `Copied: \`${cmd}\` to clipboard`);
+          copyToClipboard(cmd, 'Model Switch Command Copied', `Copied: \`${cmd}\` to clipboard`);
         }
       });
     });
@@ -894,13 +924,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (copyJsonBtn) {
-    copyJsonBtn.addEventListener('click', () => {
+    copyJsonBtn.addEventListener('click', async () => {
       if (currentRawData) {
-        navigator.clipboard.writeText(JSON.stringify(currentRawData, null, 2));
-        copyJsonBtn.textContent = 'Copied!';
-        setTimeout(() => {
-          copyJsonBtn.textContent = 'Copy JSON';
-        }, 2000);
+        const copied = await copyToClipboard(JSON.stringify(currentRawData, null, 2));
+        if (copied) {
+          copyJsonBtn.textContent = 'Copied!';
+          setTimeout(() => {
+            copyJsonBtn.textContent = 'Copy JSON';
+          }, 2000);
+        }
       }
     });
   }
