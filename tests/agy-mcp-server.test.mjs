@@ -42,9 +42,9 @@ process.stdin.on("end", () => {
   fs.chmodSync(fakeAgy, 0o755);
 }
 
-function createMcpClient(env) {
+function createMcpClient(env, server = SERVER) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "agy-mcp-"));
-  const child = spawn(process.execPath, [SERVER], {
+  const child = spawn(process.execPath, [server], {
     cwd,
     // Pin plugin state to the temp dir so tests never write into (or fail on)
     // a real CLAUDE_PLUGIN_DATA inherited from the host session.
@@ -113,6 +113,34 @@ function fakeAgyInvocation(response) {
   const line = text.split("\n").find((entry) => entry.startsWith("FAKE_AGY:"));
   assert.ok(line, `expected fake AGY invocation in response: ${text}`);
   return JSON.parse(line.slice("FAKE_AGY:".length));
+}
+
+for (const [name, server] of [
+  ["agy", SERVER],
+  ["quota-dashboard", path.join(ROOT, "plugins", "quota-dashboard", "mcp-server.js")]
+]) {
+  test(`${name} MCP server negotiates supported protocol versions`, async () => {
+    for (const [requestedVersion, expectedVersion] of [
+      ["2024-11-05", "2024-11-05"],
+      ["2025-03-26", "2025-03-26"],
+      ["2025-06-18", "2025-06-18"],
+      ["2025-11-25", "2025-11-25"],
+      ["2099-01-01", "2025-11-25"],
+      [undefined, "2024-11-05"]
+    ]) {
+      const client = createMcpClient(process.env, server);
+      try {
+        const response = await client.request("initialize", {
+          protocolVersion: requestedVersion,
+          capabilities: {},
+          clientInfo: { name: "test", version: "0.0.0" }
+        });
+        assert.equal(response.result.protocolVersion, expectedVersion);
+      } finally {
+        client.close();
+      }
+    }
+  });
 }
 
 test("AGY MCP setup backstop outlives the requested smoke timeout", () => {

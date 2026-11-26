@@ -14,6 +14,13 @@ const COMPANION = path.join(PLUGIN_ROOT, "scripts", "agy-companion.mjs");
 const PLUGIN_VERSION = JSON.parse(
   readFileSync(path.join(PLUGIN_ROOT, ".claude-plugin", "plugin.json"), "utf8")
 ).version;
+const DEFAULT_PROTOCOL_VERSION = "2024-11-05";
+const SUPPORTED_PROTOCOL_VERSIONS = [
+  "2025-11-25",
+  "2025-06-18",
+  "2025-03-26",
+  DEFAULT_PROTOCOL_VERSION
+];
 const GO_DURATION_PATTERN = /^(?:\d+(?:\.\d+)?(?:ns|us|µs|ms|s|m|h))+$/;
 // spawnSync in runCompanion is synchronous: without a timeout a foreground
 // review/rescue blocks the MCP tool call until agy returns (up to the companion
@@ -316,13 +323,17 @@ async function handle(message) {
   }
   try {
     switch (method) {
-      case "initialize":
+      case "initialize": {
+        const requestedVersion = params?.protocolVersion ?? DEFAULT_PROTOCOL_VERSION;
         sendResult(id, {
-          protocolVersion: params?.protocolVersion ?? "2024-11-05",
+          protocolVersion: SUPPORTED_PROTOCOL_VERSIONS.includes(requestedVersion)
+            ? requestedVersion
+            : SUPPORTED_PROTOCOL_VERSIONS[0],
           capabilities: { tools: {} },
           serverInfo: { name: "agy", version: PLUGIN_VERSION }
         });
         break;
+      }
       case "ping":
         sendResult(id, {});
         break;
