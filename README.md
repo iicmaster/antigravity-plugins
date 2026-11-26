@@ -19,6 +19,8 @@ It is not a general-availability hosted product. Users still need local `agy` au
 - Shared Node.js runtime scripts for launching, tracking, reading, and cancelling AGY jobs.
 - A focused Node test suite for runtime safety, plugin structure, and MCP behavior.
 
+The AGY and Quota Dashboard stdio servers support the MCP protocol revisions from `2024-11-05` through `2025-11-25`.
+
 ## Architecture Overview
 
 The current design is one AGY domain plugin with host-specific adapters around a shared runtime core:

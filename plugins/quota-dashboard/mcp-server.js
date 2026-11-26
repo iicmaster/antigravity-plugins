@@ -9,6 +9,13 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const DEFAULT_PROTOCOL_VERSION = '2024-11-05';
+const SUPPORTED_PROTOCOL_VERSIONS = [
+  '2025-11-25',
+  '2025-06-18',
+  '2025-03-26',
+  DEFAULT_PROTOCOL_VERSION
+];
 const PLUGIN_VERSION = (() => {
   try {
     return JSON.parse(
@@ -580,13 +587,17 @@ async function handle(message) {
 
   try {
     switch (method) {
-      case "initialize":
+      case "initialize": {
+        const requestedVersion = params?.protocolVersion ?? DEFAULT_PROTOCOL_VERSION;
         sendResult(id, {
-          protocolVersion: params?.protocolVersion ?? "2024-11-05",
+          protocolVersion: SUPPORTED_PROTOCOL_VERSIONS.includes(requestedVersion)
+            ? requestedVersion
+            : SUPPORTED_PROTOCOL_VERSIONS[0],
           capabilities: { tools: {} },
           serverInfo: { name: "quota-dashboard", version: PLUGIN_VERSION }
         });
         break;
+      }
       case "ping":
         sendResult(id, {});
         break;
